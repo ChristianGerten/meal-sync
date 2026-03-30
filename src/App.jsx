@@ -9,6 +9,7 @@ import RecipeDetail from './pages/RecipeDetail'
 import WeekPlanner from './pages/WeekPlanner'
 import ShoppingList from './pages/ShoppingList'
 import Layout from './components/layout/Layout'
+import CookingMode from './pages/CookingMode'
 
 function AppRoutes() {
   const { user, household } = useAuthStore()
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/*" element={<AppRoutes />} />
+        <Route path="/cook/:id" element={<CookingMode />} />
       </Routes>
     </BrowserRouter>
   )
