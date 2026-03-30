@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase'
 import Papa from 'papaparse'
 
 export default function ImportModal({ onClose }) {
-  const [tab, setTab] = useState('url')
+  const [tab, setTab] = useState('foto')
   const [url, setUrl] = useState('')
   const [preview, setPreview] = useState(null)
   const [result, setResult] = useState(null)
@@ -13,6 +13,76 @@ export default function ImportModal({ onClose }) {
   const household = useAuthStore(s => s.household)
   const { addRecipe } = useRecipeStore()
 
+  // ─── Foto Import via Claude API ───────────────────────────────
+  const handleFotoImport = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setLoading(true)
+    setResult(null)
+    setPreview(null)
+
+    try {
+      const base64 = await new Promise((res, rej) => {
+        const reader = new FileReader()
+        reader.onload = () => res(reader.result.split(',')[1])
+        reader.onerror = () => rej(new Error('Bild konnte nicht gelesen werden'))
+        reader.readAsDataURL(file)
+      })
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1500,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: file.type, data: base64 }
+              },
+              {
+                type: 'text',
+                text: `Extrahiere das Rezept aus diesem Bild vollständig. Antworte NUR mit validem JSON ohne Markdown-Blöcke oder Backticks, exakt in diesem Format:
+{
+  "name": "Rezeptname",
+  "description": "Kurze Beschreibung oder Zubereitungshinweise",
+  "category": "z.B. Pasta, Suppe, Salat",
+  "servings": 2,
+  "prep_time": null,
+  "cook_time": null,
+  "tags": ["tag1", "tag2"],
+  "ingredients": [
+    {"name": "Zutat", "amount": 200, "unit": "g", "category": "Gemüse"}
+  ]
+}
+Kategorien für Zutaten: Gemüse, Obst, Fleisch, Fisch, Kühlregal, Milchprodukte, Nudeln, Reis & Getreide, Konserven, Gewürze, Backen, Getränke, Sonstiges.
+Falls eine Information nicht erkennbar ist, verwende null.`
+              }
+            ]
+          }]
+        })
+      })
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error?.message || 'API Fehler')
+      }
+
+      const data = await response.json()
+      const text = data.content[0].text.trim()
+      const clean = text.replace(/```json|```/g, '').trim()
+      const recipe = JSON.parse(clean)
+      setPreview(recipe)
+    } catch (err) {
+      setResult(`❌ Fehler: ${err.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ─── URL Import via Edge Function ────────────────────────────
   const handleScrape = async () => {
     if (!url.trim()) return
     setLoading(true)
@@ -32,6 +102,7 @@ export default function ImportModal({ onClose }) {
     }
   }
 
+  // ─── Vorschau speichern ───────────────────────────────────────
   const handleSavePreview = async () => {
     if (!preview) return
     setLoading(true)
@@ -47,6 +118,7 @@ export default function ImportModal({ onClose }) {
     }
   }
 
+  // ─── JSON Import ──────────────────────────────────────────────
   const handleJSON = async (e) => {
     const file = e.target.files[0]
     if (!file) return
@@ -62,6 +134,7 @@ export default function ImportModal({ onClose }) {
     } finally { setLoading(false) }
   }
 
+  // ─── CSV Import ───────────────────────────────────────────────
   const handleCSV = async (e) => {
     const file = e.target.files[0]
     if (!file) return
@@ -74,7 +147,8 @@ export default function ImportModal({ onClose }) {
           for (const row of results.data) {
             if (!row.name) continue
             await addRecipe({
-              name: row.name, category: row.category || '',
+              name: row.name,
+              category: row.category || '',
               description: row.description || '',
               tags: row.tags ? row.tags.split(';').map(t => t.trim()) : [],
               servings: Number(row.servings) || 2,
@@ -92,7 +166,12 @@ export default function ImportModal({ onClose }) {
     })
   }
 
-  const tabs = ['url', 'json', 'csv']
+  const tabs = [
+    { key: 'foto', label: '📷 Foto' },
+    { key: 'url', label: '🌐 URL' },
+    { key: 'json', label: '📄 JSON' },
+    { key: 'csv', label: '📊 CSV' },
+  ]
 
   return (
     <div style={{
@@ -103,40 +182,181 @@ export default function ImportModal({ onClose }) {
       <div style={{
         background: 'var(--color-surface)',
         borderRadius: '20px 20px 0 0',
-        width: '100%', maxHeight: '85vh',
+        width: '100%', maxHeight: '88vh',
         display: 'flex', flexDirection: 'column'
       }}>
         {/* Header */}
-        <div style={{padding: '16px', borderBottom: '0.5px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-          <span style={{fontWeight: '500', color: 'var(--color-text)'}}>Rezept importieren</span>
-          <button onClick={onClose} style={{background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: 'var(--color-text-muted)'}}>×</button>
+        <div style={{
+          padding: '16px',
+          borderBottom: '0.5px solid var(--color-border)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+        }}>
+          <span style={{fontWeight: '500', fontSize: '16px', color: 'var(--color-text)'}}>
+            Rezept importieren
+          </span>
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none',
+            cursor: 'pointer', fontSize: '22px',
+            color: 'var(--color-text-muted)'
+          }}>×</button>
         </div>
 
         {/* Tabs */}
-        <div style={{display: 'flex', gap: '6px', padding: '12px 16px', borderBottom: '0.5px solid var(--color-border)'}}>
+        <div style={{
+          display: 'flex', gap: '6px',
+          padding: '12px 16px',
+          borderBottom: '0.5px solid var(--color-border)'
+        }}>
           {tabs.map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{
-              flex: 1, padding: '8px', borderRadius: '10px', border: 'none',
-              cursor: 'pointer', fontSize: '12px', fontWeight: '500',
-              background: tab === t ? 'var(--color-accent-soft)' : 'var(--color-surface-2)',
-              color: tab === t ? 'var(--color-accent-text)' : 'var(--color-text-muted)'
+            <button key={t.key} onClick={() => { setTab(t.key); setPreview(null); setResult(null) }} style={{
+              flex: 1, padding: '8px 4px',
+              borderRadius: '10px', border: 'none',
+              cursor: 'pointer', fontSize: '11px', fontWeight: '500',
+              background: tab === t.key ? 'var(--color-accent-soft)' : 'var(--color-surface-2)',
+              color: tab === t.key ? 'var(--color-accent-text)' : 'var(--color-text-muted)'
             }}>
-              {t === 'url' ? '🌐 URL' : t === 'json' ? '📄 JSON' : '📊 CSV'}
+              {t.label}
             </button>
           ))}
         </div>
 
+        {/* Content */}
         <div style={{flex: 1, overflowY: 'auto', padding: '16px'}}>
-          {/* URL Tab */}
+
+          {/* ── FOTO TAB ── */}
+          {tab === 'foto' && (
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+              <p style={{fontSize: '13px', color: 'var(--color-text-muted)', lineHeight: '1.5'}}>
+                Fotografiere ein Rezept aus einem Kochbuch, einer Zeitschrift oder mache einen Screenshot — KI erkennt automatisch alle Zutaten und Informationen.
+              </p>
+
+              {!preview && (
+                <label style={{
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  gap: '10px', padding: '36px 20px',
+                  border: '1.5px dashed var(--color-border)',
+                  borderRadius: '16px', cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.6 : 1,
+                  transition: 'border-color 0.15s'
+                }}>
+                  <span style={{fontSize: '44px'}}>
+                    {loading ? '⏳' : '📷'}
+                  </span>
+                  <span style={{
+                    fontSize: '14px', fontWeight: '500',
+                    color: 'var(--color-text)'
+                  }}>
+                    {loading ? 'KI analysiert Foto...' : 'Foto auswählen'}
+                  </span>
+                  <span style={{fontSize: '12px', color: 'var(--color-text-muted)'}}>
+                    Kochbuch · Rezeptkarte · Screenshot
+                  </span>
+                  <input
+                    type="file" accept="image/*"
+                    onChange={handleFotoImport}
+                    style={{display: 'none'}}
+                    disabled={loading}
+                  />
+                </label>
+              )}
+
+              {/* Vorschau nach Foto-Analyse */}
+              {preview && (
+                <div style={{
+                  background: 'var(--color-surface-2)',
+                  borderRadius: '14px', padding: '14px',
+                  border: '0.5px solid var(--color-border)'
+                }}>
+                  <div style={{
+                    fontSize: '11px', fontWeight: '500',
+                    color: 'var(--color-accent-text)',
+                    background: 'var(--color-accent-soft)',
+                    padding: '3px 8px', borderRadius: '20px',
+                    display: 'inline-block', marginBottom: '10px'
+                  }}>
+                    ✨ KI-Erkennung
+                  </div>
+
+                  <div style={{fontWeight: '500', fontSize: '16px', color: 'var(--color-text)', marginBottom: '4px'}}>
+                    {preview.name}
+                  </div>
+
+                  {preview.category && (
+                    <div style={{fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '8px'}}>
+                      {preview.category}
+                      {preview.cook_time && ` · ${preview.cook_time} min`}
+                      {preview.servings && ` · ${preview.servings} Portionen`}
+                    </div>
+                  )}
+
+                  {preview.ingredients?.length > 0 && (
+                    <div style={{marginBottom: '12px'}}>
+                      <div style={{
+                        fontSize: '11px', color: 'var(--color-text-muted)',
+                        marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px'
+                      }}>
+                        {preview.ingredients.length} Zutaten erkannt
+                      </div>
+                      <div style={{display: 'flex', flexWrap: 'wrap', gap: '4px'}}>
+                        {preview.ingredients.slice(0, 8).map((ing, i) => (
+                          <span key={i} style={{
+                            fontSize: '11px', padding: '3px 8px',
+                            background: 'var(--color-surface)',
+                            borderRadius: '20px', color: 'var(--color-text-muted)',
+                            border: '0.5px solid var(--color-border)'
+                          }}>
+                            {ing.amount && `${ing.amount} `}{ing.unit && `${ing.unit} `}{ing.name}
+                          </span>
+                        ))}
+                        {preview.ingredients.length > 8 && (
+                          <span style={{
+                            fontSize: '11px', padding: '3px 8px',
+                            color: 'var(--color-text-muted)'
+                          }}>
+                            +{preview.ingredients.length - 8} weitere
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{display: 'flex', gap: '8px'}}>
+                    <button onClick={handleSavePreview} disabled={loading} style={{
+                      flex: 1, padding: '11px',
+                      background: '#6c63ff', color: '#fff',
+                      border: 'none', borderRadius: '10px',
+                      cursor: 'pointer', fontSize: '13px', fontWeight: '500',
+                      opacity: loading ? 0.6 : 1
+                    }}>
+                      {loading ? 'Speichere...' : 'Rezept speichern'}
+                    </button>
+                    <button onClick={() => setPreview(null)} style={{
+                      padding: '11px 14px',
+                      background: 'var(--color-surface)',
+                      border: '0.5px solid var(--color-border)',
+                      borderRadius: '10px', cursor: 'pointer',
+                      fontSize: '13px', color: 'var(--color-text-muted)'
+                    }}>
+                      Neu
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── URL TAB ── */}
           {tab === 'url' && (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <p style={{fontSize: '13px', color: 'var(--color-text-muted)'}}>
-                Füge einen Link zu einem Rezept ein — z.B. von Chefkoch, essen.de oder anderen Seiten.
+                Link zu einem Rezept einfügen — funktioniert mit Seiten die das Schema.org Format nutzen (essen.de, lecker.de, bbcgoodfood.com etc.)
               </p>
               <div style={{display: 'flex', gap: '8px'}}>
                 <input
-                  value={url} onChange={e => setUrl(e.target.value)}
-                  placeholder="https://www.chefkoch.de/rezepte/..."
+                  value={url}
+                  onChange={e => setUrl(e.target.value)}
+                  placeholder="https://www.lecker.de/rezept/..."
                   style={{
                     flex: 1, padding: '10px 14px',
                     background: 'var(--color-input)',
@@ -155,7 +375,6 @@ export default function ImportModal({ onClose }) {
                 </button>
               </div>
 
-              {/* Vorschau */}
               {preview && (
                 <div style={{
                   background: 'var(--color-surface-2)',
@@ -163,7 +382,10 @@ export default function ImportModal({ onClose }) {
                   border: '0.5px solid var(--color-border)'
                 }}>
                   {preview.image_url && (
-                    <img src={preview.image_url} alt="" style={{width: '100%', height: '140px', objectFit: 'cover'}}/>
+                    <img
+                      src={preview.image_url} alt=""
+                      style={{width: '100%', height: '140px', objectFit: 'cover'}}
+                    />
                   )}
                   <div style={{padding: '12px'}}>
                     <div style={{fontWeight: '500', fontSize: '15px', color: 'var(--color-text)', marginBottom: '4px'}}>
@@ -171,16 +393,15 @@ export default function ImportModal({ onClose }) {
                     </div>
                     {preview.category && (
                       <div style={{fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '8px'}}>
-                        {preview.category}
-                        {preview.cook_time && ` · ${preview.cook_time} min`}
+                        {preview.category}{preview.cook_time && ` · ${preview.cook_time} min`}
                       </div>
                     )}
                     {preview.ingredients?.length > 0 && (
-                      <div style={{fontSize: '12px', color: 'var(--color-text-muted)'}}>
+                      <div style={{fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '10px'}}>
                         {preview.ingredients.length} Zutaten erkannt
                       </div>
                     )}
-                    <div style={{display: 'flex', gap: '8px', marginTop: '12px'}}>
+                    <div style={{display: 'flex', gap: '8px'}}>
                       <button onClick={handleSavePreview} disabled={loading} style={{
                         flex: 1, padding: '10px',
                         background: '#6c63ff', color: '#fff',
@@ -189,7 +410,7 @@ export default function ImportModal({ onClose }) {
                       }}>
                         Rezept speichern
                       </button>
-                      <button onClick={() => setPreview(null)} style={{
+                      <button onClick={() => { setPreview(null); setUrl('') }} style={{
                         padding: '10px 14px',
                         background: 'var(--color-surface)',
                         border: '0.5px solid var(--color-border)',
@@ -205,7 +426,7 @@ export default function ImportModal({ onClose }) {
             </div>
           )}
 
-          {/* JSON Tab */}
+          {/* ── JSON TAB ── */}
           {tab === 'json' && (
             <div>
               <p style={{fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '12px'}}>
@@ -213,20 +434,25 @@ export default function ImportModal({ onClose }) {
               </p>
               <label style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
-                gap: '8px', padding: '24px',
+                gap: '8px', padding: '28px',
                 border: '1.5px dashed var(--color-border)',
                 borderRadius: '14px', cursor: 'pointer'
               }}>
-                <span style={{fontSize: '32px'}}>📄</span>
+                <span style={{fontSize: '36px'}}>📄</span>
                 <span style={{fontSize: '13px', color: 'var(--color-text-muted)'}}>
                   {loading ? 'Importiere...' : 'JSON-Datei auswählen'}
                 </span>
-                <input type="file" accept=".json" onChange={handleJSON} style={{display: 'none'}} disabled={loading}/>
+                <input
+                  type="file" accept=".json"
+                  onChange={handleJSON}
+                  style={{display: 'none'}}
+                  disabled={loading}
+                />
               </label>
             </div>
           )}
 
-          {/* CSV Tab */}
+          {/* ── CSV TAB ── */}
           {tab === 'csv' && (
             <div>
               <p style={{fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '4px'}}>
@@ -237,22 +463,29 @@ export default function ImportModal({ onClose }) {
               </p>
               <label style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
-                gap: '8px', padding: '24px',
+                gap: '8px', padding: '28px',
                 border: '1.5px dashed var(--color-border)',
                 borderRadius: '14px', cursor: 'pointer'
               }}>
-                <span style={{fontSize: '32px'}}>📊</span>
+                <span style={{fontSize: '36px'}}>📊</span>
                 <span style={{fontSize: '13px', color: 'var(--color-text-muted)'}}>
                   {loading ? 'Importiere...' : 'CSV-Datei auswählen'}
                 </span>
-                <input type="file" accept=".csv" onChange={handleCSV} style={{display: 'none'}} disabled={loading}/>
+                <input
+                  type="file" accept=".csv"
+                  onChange={handleCSV}
+                  style={{display: 'none'}}
+                  disabled={loading}
+                />
               </label>
             </div>
           )}
 
+          {/* Ergebnis */}
           {result && (
             <div style={{
-              marginTop: '12px', padding: '12px 14px', borderRadius: '10px', fontSize: '13px',
+              marginTop: '12px', padding: '12px 14px',
+              borderRadius: '10px', fontSize: '13px',
               background: result.startsWith('✅') ? 'var(--color-accent-soft)' : '#2d1515',
               color: result.startsWith('✅') ? 'var(--color-accent-text)' : '#fc8181'
             }}>
@@ -264,7 +497,8 @@ export default function ImportModal({ onClose }) {
             <button onClick={onClose} style={{
               marginTop: '8px', width: '100%', padding: '12px',
               background: '#6c63ff', color: '#fff', border: 'none',
-              borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: '500'
+              borderRadius: '10px', cursor: 'pointer',
+              fontSize: '14px', fontWeight: '500'
             }}>
               Fertig
             </button>

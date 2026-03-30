@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Upload } from 'lucide-react'
 import { useRecipeStore } from '../store/useRecipeStore'
 import { useAuthStore } from '../store/useAuthStore'
 import ImportModal from '../components/recipes/ImportModal'
+
+const CATEGORIES = ['Alle', 'Pasta', 'Suppe', 'Salat', 'Fleisch', 'Fisch', 'Vegetarisch', 'Backen', 'Dessert']
 
 export default function Recipes() {
   const household = useAuthStore(s => s.household)
   const { recipes, fetchRecipes, loading } = useRecipeStore()
   const [search, setSearch] = useState('')
+  const [activeCategory, setActiveCategory] = useState('Alle')
   const [showImport, setShowImport] = useState(false)
   const navigate = useNavigate()
 
@@ -16,66 +18,204 @@ export default function Recipes() {
     if (household) fetchRecipes(household.id)
   }, [household])
 
-  const filtered = recipes.filter(r =>
-    r.name.toLowerCase().includes(search.toLowerCase()) ||
-    r.category?.toLowerCase().includes(search.toLowerCase()) ||
-    r.tags?.some(t => t.toLowerCase().includes(search.toLowerCase()))
-  )
+  const filtered = recipes.filter(r => {
+    const matchSearch =
+      r.name.toLowerCase().includes(search.toLowerCase()) ||
+      r.category?.toLowerCase().includes(search.toLowerCase()) ||
+      r.tags?.some(t => t.toLowerCase().includes(search.toLowerCase()))
+    const matchCategory =
+      activeCategory === 'Alle' ||
+      r.category?.toLowerCase() === activeCategory.toLowerCase() ||
+      r.tags?.some(t => t.toLowerCase() === activeCategory.toLowerCase())
+    return matchSearch && matchCategory
+  })
 
   return (
-    <div className="p-4">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+    <div style={{padding: '16px'}}>
+
+      {/* Suchleiste + Buttons */}
+      <div style={{display: 'flex', gap: '8px', marginBottom: '12px'}}>
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', gap: '8px',
+          background: 'var(--color-surface)',
+          border: '0.5px solid var(--color-border)',
+          borderRadius: '12px', padding: '0 12px'
+        }}>
+          <span style={{fontSize: '14px', color: 'var(--color-text-muted)'}}>🔍</span>
           <input
-            type="text" value={search} onChange={e => setSearch(e.target.value)}
+            type="text" value={search}
+            onChange={e => setSearch(e.target.value)}
             placeholder="Rezepte suchen..."
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            style={{
+              flex: 1, padding: '10px 0',
+              background: 'none', border: 'none',
+              fontSize: '14px', color: 'var(--color-text)',
+              outline: 'none'
+            }}
           />
+          {search && (
+            <button onClick={() => setSearch('')} style={{
+              background: 'none', border: 'none',
+              cursor: 'pointer', fontSize: '16px',
+              color: 'var(--color-text-muted)'
+            }}>×</button>
+          )}
         </div>
-        <button onClick={() => setShowImport(true)}
-          className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50">
-          <Upload size={18} className="text-gray-600" />
+
+        <button
+          onClick={() => setShowImport(true)}
+          title="Rezept importieren"
+          style={{
+            width: '42px', height: '42px',
+            background: 'var(--color-surface)',
+            border: '0.5px solid var(--color-border)',
+            borderRadius: '12px', cursor: 'pointer',
+            fontSize: '18px', display: 'flex',
+            alignItems: 'center', justifyContent: 'center'
+          }}
+        >
+          📥
         </button>
-        <button onClick={() => navigate('/recipes/new')}
-          className="p-2.5 bg-green-600 rounded-xl">
-          <Plus size={18} className="text-white" />
+
+        <button
+          onClick={() => navigate('/recipes/new')}
+          title="Neues Rezept"
+          style={{
+            width: '42px', height: '42px',
+            background: '#6c63ff', border: 'none',
+            borderRadius: '12px', cursor: 'pointer',
+            fontSize: '20px', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            color: '#fff'
+          }}
+        >
+          +
         </button>
       </div>
 
-      {/* Rezept-Grid */}
+      {/* Kategorie-Filter */}
+      <div style={{
+        display: 'flex', gap: '6px',
+        overflowX: 'auto', paddingBottom: '8px',
+        marginBottom: '12px'
+      }}>
+        {CATEGORIES.map(cat => (
+          <button key={cat} onClick={() => setActiveCategory(cat)} style={{
+            padding: '6px 12px', borderRadius: '20px',
+            border: 'none', cursor: 'pointer',
+            fontSize: '12px', fontWeight: '500',
+            whiteSpace: 'nowrap', flexShrink: 0,
+            background: activeCategory === cat ? '#6c63ff' : 'var(--color-surface)',
+            color: activeCategory === cat ? '#fff' : 'var(--color-text-muted)',
+            transition: 'all 0.15s'
+          }}>
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {/* Anzahl */}
+      {!loading && (
+        <div style={{
+          fontSize: '12px', color: 'var(--color-text-muted)',
+          marginBottom: '12px'
+        }}>
+          {filtered.length} {filtered.length === 1 ? 'Rezept' : 'Rezepte'}
+          {activeCategory !== 'Alle' && ` in ${activeCategory}`}
+        </div>
+      )}
+
+      {/* Rezept Grid */}
       {loading ? (
-        <p className="text-center text-gray-400 py-8">Lade Rezepte...</p>
+        <div style={{textAlign: 'center', padding: '48px', color: 'var(--color-text-muted)'}}>
+          Lade Rezepte...
+        </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="text-5xl mb-4">👨‍🍳</div>
-          <p className="text-gray-500 font-medium">Noch keine Rezepte</p>
-          <p className="text-gray-400 text-sm mt-1">Füge dein erstes Rezept hinzu!</p>
+        <div style={{textAlign: 'center', padding: '48px'}}>
+          <div style={{fontSize: '48px', marginBottom: '12px'}}>👨‍🍳</div>
+          <p style={{fontWeight: '500', color: 'var(--color-text)', marginBottom: '6px'}}>
+            Noch keine Rezepte
+          </p>
+          <p style={{fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '16px'}}>
+            Importiere dein erstes Rezept per Foto oder füge es manuell hinzu
+          </p>
+          <button onClick={() => setShowImport(true)} style={{
+            padding: '10px 20px', background: '#6c63ff',
+            color: '#fff', border: 'none', borderRadius: '10px',
+            cursor: 'pointer', fontSize: '13px', fontWeight: '500'
+          }}>
+            📷 Rezept importieren
+          </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: '10px'
+        }}>
           {filtered.map(recipe => (
-            <button key={recipe.id} onClick={() => navigate(`/recipes/${recipe.id}`)}
-              className="bg-white rounded-xl shadow-sm overflow-hidden text-left hover:shadow-md transition-shadow">
-              <div className="aspect-video bg-gray-100 flex items-center justify-center text-3xl">
+            <button
+              key={recipe.id}
+              onClick={() => navigate(`/recipes/${recipe.id}`)}
+              style={{
+                background: 'var(--color-surface)',
+                border: '0.5px solid var(--color-border)',
+                borderRadius: '14px', overflow: 'hidden',
+                textAlign: 'left', cursor: 'pointer',
+                transition: 'transform 0.1s'
+              }}
+            >
+              {/* Bild */}
+              <div style={{
+                aspectRatio: '16/9',
+                background: 'var(--color-surface-2)',
+                display: 'flex', alignItems: 'center',
+                justifyContent: 'center', fontSize: '32px',
+                overflow: 'hidden'
+              }}>
                 {recipe.image_url
-                  ? <img src={recipe.image_url} alt={recipe.name} className="w-full h-full object-cover" />
+                  ? <img
+                      src={recipe.image_url} alt={recipe.name}
+                      style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                    />
                   : '🍽️'
                 }
               </div>
-              <div className="p-2.5">
-                <p className="font-semibold text-sm text-gray-900 line-clamp-2">{recipe.name}</p>
-                {recipe.category && (
-                  <p className="text-xs text-gray-400 mt-0.5">{recipe.category}</p>
-                )}
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {recipe.tags?.slice(0, 2).map(tag => (
-                    <span key={tag} className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">
-                      {tag}
-                    </span>
-                  ))}
+
+              {/* Info */}
+              <div style={{padding: '10px'}}>
+                <div style={{
+                  fontWeight: '500', fontSize: '13px',
+                  color: 'var(--color-text)',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  lineHeight: '1.3',
+                  marginBottom: '4px'
+                }}>
+                  {recipe.name}
                 </div>
+                {recipe.category && (
+                  <div style={{fontSize: '11px', color: 'var(--color-text-muted)'}}>
+                    {recipe.category}
+                    {recipe.cook_time && ` · ${recipe.cook_time} min`}
+                  </div>
+                )}
+                {recipe.tags?.length > 0 && (
+                  <div style={{display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '5px'}}>
+                    {recipe.tags.slice(0, 2).map(tag => (
+                      <span key={tag} style={{
+                        fontSize: '10px', padding: '2px 6px',
+                        background: 'var(--color-accent-soft)',
+                        color: 'var(--color-accent-text)',
+                        borderRadius: '20px'
+                      }}>
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </button>
           ))}
@@ -83,7 +223,10 @@ export default function Recipes() {
       )}
 
       {showImport && (
-        <ImportModal onClose={() => { setShowImport(false); fetchRecipes(household.id) }} />
+        <ImportModal onClose={() => {
+          setShowImport(false)
+          if (household) fetchRecipes(household.id)
+        }} />
       )}
     </div>
   )
