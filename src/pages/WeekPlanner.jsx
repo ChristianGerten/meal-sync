@@ -5,8 +5,6 @@ import { usePlanStore } from '../store/usePlanStore'
 import { useRecipeStore } from '../store/useRecipeStore'
 import { useAuthStore } from '../store/useAuthStore'
 import { exportWeekPlanAsPDF } from '../lib/exportPDF'
-import { format, addDays, parseISO } from 'date-fns'
-import { de } from 'date-fns/locale'
 
 const DAYS = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
 const DAYS_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
