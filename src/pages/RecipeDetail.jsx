@@ -124,8 +124,8 @@ export default function RecipeDetail() {
     const parsed = lines.map(parseIngredientLine).filter(Boolean)
     if (parsed.length) {
       setIngredients(prev => {
-        const existing = prev.filter(i => i.name.trim())
-        return [...existing, ...parsed]
+        const filtered = prev.filter(i => i.name.trim())
+        return [...filtered, ...parsed]
       })
       setQuickInput('')
       setQuickMode(false)
@@ -196,7 +196,7 @@ export default function RecipeDetail() {
             <button onClick={handleDelete} style={{
               background: 'none', border: 'none',
               cursor: 'pointer', padding: '4px',
-              color: 'var(--color-danger, #e53e3e)',
+              color: '#e53e3e',
               display: 'flex', alignItems: 'center'
             }}>
               <Trash2 size={18} />
@@ -218,7 +218,7 @@ export default function RecipeDetail() {
 
       <div style={{padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px'}}>
 
-        {/* Kochen Button — nur bei bestehendem Rezept mit Schritten */}
+        {/* Kochen Button */}
         {!isNew && existing?.recipe_steps?.length > 0 && (
           <button onClick={() => navigate(`/cook/${id}`)} style={{
             width: '100%', padding: '13px',
@@ -289,9 +289,7 @@ export default function RecipeDetail() {
           border: '0.5px solid var(--color-border)',
           borderRadius: '12px', padding: '10px 16px'
         }}>
-          <span style={{
-            fontSize: '13px', color: 'var(--color-text-muted)', flex: 1
-          }}>
+          <span style={{fontSize: '13px', color: 'var(--color-text-muted)', flex: 1}}>
             Portionen
           </span>
           <button
@@ -300,8 +298,7 @@ export default function RecipeDetail() {
               width: '30px', height: '30px', borderRadius: '8px',
               background: 'var(--color-surface-2)',
               border: '0.5px solid var(--color-border)',
-              cursor: 'pointer', fontSize: '18px',
-              color: 'var(--color-text)',
+              cursor: 'pointer', fontSize: '18px', color: 'var(--color-text)',
               display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}
           >−</button>
@@ -317,8 +314,7 @@ export default function RecipeDetail() {
               width: '30px', height: '30px', borderRadius: '8px',
               background: 'var(--color-surface-2)',
               border: '0.5px solid var(--color-border)',
-              cursor: 'pointer', fontSize: '18px',
-              color: 'var(--color-text)',
+              cursor: 'pointer', fontSize: '18px', color: 'var(--color-text)',
               display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}
           >+</button>
@@ -339,12 +335,12 @@ export default function RecipeDetail() {
                 ...f, category: f.category === cat ? '' : cat
               }))} style={{
                 padding: '7px 14px', borderRadius: '20px',
-                border: 'none', cursor: 'pointer', fontSize: '12px',
+                cursor: 'pointer', fontSize: '12px',
                 fontWeight: form.category === cat ? '500' : '400',
                 background: form.category === cat ? '#6c63ff' : 'var(--color-surface)',
                 color: form.category === cat ? '#fff' : 'var(--color-text-muted)',
                 border: form.category === cat
-                  ? 'none'
+                  ? '2px solid #6c63ff'
                   : '0.5px solid var(--color-border)',
                 transition: 'all 0.15s'
               }}>
@@ -394,9 +390,7 @@ export default function RecipeDetail() {
             display: 'flex', alignItems: 'center',
             justifyContent: 'space-between', marginBottom: '10px'
           }}>
-            <span style={{
-              fontSize: '14px', fontWeight: '500', color: 'var(--color-text)'
-            }}>
+            <span style={{fontSize: '14px', fontWeight: '500', color: 'var(--color-text)'}}>
               Zutaten
             </span>
             <button onClick={() => setQuickMode(q => !q)} style={{
@@ -530,9 +524,7 @@ export default function RecipeDetail() {
             display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'
           }}>
             <ChefHat size={16} color="#6c63ff" />
-            <span style={{
-              fontSize: '14px', fontWeight: '500', color: 'var(--color-text)'
-            }}>
+            <span style={{fontSize: '14px', fontWeight: '500', color: 'var(--color-text)'}}>
               Zubereitungsschritte
             </span>
           </div>
@@ -545,3 +537,89 @@ export default function RecipeDetail() {
                   background: step.trim() ? '#6c63ff' : 'var(--color-surface-2)',
                   border: step.trim() ? 'none' : '0.5px solid var(--color-border)',
                   color: step.trim() ? '#fff' : 'var(--color-text-muted)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '12px', fontWeight: '500',
+                  flexShrink: 0, marginTop: '9px',
+                  transition: 'background 0.2s'
+                }}>
+                  {i + 1}
+                </div>
+                <textarea
+                  value={step}
+                  onChange={e => updateStep(i, e.target.value)}
+                  placeholder={`Schritt ${i + 1}…`}
+                  rows={2}
+                  style={{
+                    flex: 1, padding: '10px 12px',
+                    background: 'var(--color-surface)',
+                    border: '0.5px solid var(--color-border)',
+                    borderRadius: '10px', fontSize: '13px',
+                    color: 'var(--color-text)', outline: 'none',
+                    resize: 'none', lineHeight: '1.5',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                {steps.length > 1 && (
+                  <button
+                    onClick={() => setSteps(steps.filter((_, j) => j !== i))}
+                    style={{
+                      background: 'none', border: 'none',
+                      cursor: 'pointer', padding: '6px',
+                      color: 'var(--color-text-muted)',
+                      marginTop: '6px',
+                      display: 'flex', alignItems: 'center'
+                    }}
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setSteps([...steps, ''])}
+            style={{
+              marginTop: '10px',
+              display: 'flex', alignItems: 'center', gap: '5px',
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: '13px', color: '#6c63ff', padding: '4px 0'
+            }}
+          >
+            <Plus size={14} /> Schritt hinzufügen
+          </button>
+        </div>
+
+        {/* Trennlinie */}
+        <div style={{height: '0.5px', background: 'var(--color-border)'}} />
+
+        {/* Notizen */}
+        <div>
+          <div style={{
+            fontSize: '12px', fontWeight: '500',
+            color: 'var(--color-text-muted)', marginBottom: '8px',
+            textTransform: 'uppercase', letterSpacing: '0.5px'
+          }}>
+            Notizen & Tipps
+          </div>
+          <textarea
+            value={form.description}
+            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+            placeholder="Variationen, Tipps, Hinweise..."
+            rows={3}
+            style={{
+              width: '100%', padding: '12px 14px',
+              background: 'var(--color-surface)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: '12px', fontSize: '13px',
+              color: 'var(--color-text)', outline: 'none',
+              resize: 'none', boxSizing: 'border-box',
+              lineHeight: '1.5'
+            }}
+          />
+        </div>
+
+      </div>
+    </div>
+  )
+}
