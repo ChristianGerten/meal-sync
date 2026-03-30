@@ -3,12 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/useAuthStore'
 
 export default function Login() {
-  const [mode, setMode] = useState('login') // 'login' | 'register'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { signIn, signUp } = useAuthStore()
+  const { signIn } = useAuthStore()
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
@@ -16,68 +15,91 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      if (mode === 'login') {
-        await signIn(email, password)
-      } else {
-        await signUp(email, password)
-      }
+      await signIn(email, password)
       navigate('/')
     } catch (err) {
-      setError(err.message)
+      setError('E-Mail oder Passwort falsch')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-3">🍽️</div>
-          <h1 className="text-2xl font-bold text-gray-900">MealSync</h1>
-          <p className="text-gray-500 text-sm mt-1">Gemeinsam kochen planen</p>
+    <div className="min-h-screen flex items-center justify-center p-4" 
+         style={{background: 'var(--color-bg)'}}>
+      <div style={{
+        background: 'var(--color-surface)',
+        border: '0.5px solid var(--color-border)',
+        borderRadius: '16px',
+        padding: '2rem',
+        width: '100%',
+        maxWidth: '360px'
+      }}>
+        <div style={{textAlign: 'center', marginBottom: '2rem'}}>
+          <div style={{fontSize: '48px', marginBottom: '12px'}}>🍽️</div>
+          <h1 style={{fontSize: '22px', fontWeight: '500', color: 'var(--color-text)'}}>
+            MealSync
+          </h1>
+          <p style={{fontSize: '14px', color: 'var(--color-text-muted)', marginTop: '4px'}}>
+            Gemeinsam kochen planen
+          </p>
         </div>
 
-        <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
-          {['login', 'register'].map(m => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`flex-1 py-2 rounded-md text-sm font-medium transition-all
-                ${mode === m ? 'bg-white shadow text-green-700' : 'text-gray-500'}`}
-            >
-              {m === 'login' ? 'Anmelden' : 'Registrieren'}
-            </button>
-          ))}
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
+            <label style={{display: 'block', fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '6px'}}>
+              E-Mail
+            </label>
             <input
-              type="email" value={email} onChange={e => setEmail(e.target.value)}
+              type="email" value={email}
+              onChange={e => setEmail(e.target.value)}
               required placeholder="name@beispiel.de"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              style={{
+                width: '100%', padding: '10px 14px',
+                background: 'var(--color-input)',
+                border: '0.5px solid var(--color-border)',
+                borderRadius: '10px', fontSize: '14px',
+                color: 'var(--color-text)', outline: 'none'
+              }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Passwort</label>
+            <label style={{display: 'block', fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '6px'}}>
+              Passwort
+            </label>
             <input
-              type="password" value={password} onChange={e => setPassword(e.target.value)}
-              required placeholder="Mindestens 6 Zeichen"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              type="password" value={password}
+              onChange={e => setPassword(e.target.value)}
+              required placeholder="••••••••"
+              style={{
+                width: '100%', padding: '10px 14px',
+                background: 'var(--color-input)',
+                border: '0.5px solid var(--color-border)',
+                borderRadius: '10px', fontSize: '14px',
+                color: 'var(--color-text)', outline: 'none'
+              }}
             />
           </div>
 
           {error && (
-            <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{error}</p>
+            <div style={{
+              background: 'var(--color-danger-bg)',
+              color: 'var(--color-danger)',
+              padding: '10px 14px', borderRadius: '10px', fontSize: '13px'
+            }}>
+              {error}
+            </div>
           )}
 
-          <button
-            type="submit" disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition-colors"
-          >
-            {loading ? 'Bitte warten...' : (mode === 'login' ? 'Anmelden' : 'Account erstellen')}
+          <button type="submit" disabled={loading} style={{
+            marginTop: '8px', padding: '12px',
+            background: '#6c63ff', color: '#fff',
+            border: 'none', borderRadius: '10px',
+            fontSize: '14px', fontWeight: '500',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.7 : 1
+          }}>
+            {loading ? 'Anmelden...' : 'Anmelden'}
           </button>
         </form>
       </div>

@@ -1,1 +1,49 @@
 @import "tailwindcss";
+
+:root {
+  --color-bg: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-surface-2: #f0f1f5;
+  --color-border: rgba(0,0,0,0.1);
+  --color-text: #1a1a2e;
+  --color-text-muted: #718096;
+  --color-input: #f0f1f5;
+  --color-accent: #6c63ff;
+  --color-accent-soft: #e9e8ff;
+  --color-accent-text: #5548c8;
+  --color-danger-bg: #fff0f0;
+  --color-danger: #e53e3e;
+  --color-nav: #ffffff;
+  --color-nav-border: rgba(0,0,0,0.08);
+}
+
+[data-theme="dark"] {
+  --color-bg: #0f1117;
+  --color-surface: #1e2130;
+  --color-surface-2: #2a2d3e;
+  --color-border: rgba(255,255,255,0.08);
+  --color-text: #e2e8f0;
+  --color-text-muted: #888ea8;
+  --color-input: #2a2d3e;
+  --color-accent: #6c63ff;
+  --color-accent-soft: #2d2a4a;
+  --color-accent-text: #a09aff;
+  --color-danger-bg: #2d1515;
+  --color-danger: #fc8181;
+  --color-nav: #1e2130;
+  --color-nav-border: rgba(255,255,255,0.06);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-sans, system-ui, sans-serif);
+  background: var(--color-bg);
+  color: var(--color-text);
+  transition: background 0.2s, color 0.2s;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  color: var(--color-text);
+}
