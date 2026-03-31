@@ -6,6 +6,25 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+const emptyRecipe = {
+  name: '',
+  description: '',
+  category: '',
+  servings: 2,
+  prep_time: null,
+  cook_time: null,
+  tags: [],
+  ingredients: []
+}
+
+const sanitizeJson = (str: string) => {
+  return str
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    .replace(/\t/g, ' ')
+    .replace(/\n/g, ' ')
+    .replace(/\r/g, ' ')
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -25,21 +44,25 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1500,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: mediaType, data: base64 }
-            },
-            {
-              type: 'text',
-              text: `Extrahiere das Rezept aus diesem Bild. Antworte NUR mit validem JSON ohne Markdown:
-{"name":"","description":"","category":"","servings":2,"prep_time":null,"cook_time":null,"tags":[],"ingredients":[{"name":"","amount":null,"unit":"","category":"Sonstiges"}]}
-Kategorien für Zutaten: Gemüse, Obst, Fleisch, Fisch, Kühlregal, Milchprodukte, Nudeln, Reis & Getreide, Konserven, Gewürze, Backen, Sonstiges.`
-            }
-          ]
-        }]
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: mediaType, data: base64 }
+              },
+              {
+                type: 'text',
+                text: 'Extract the recipe from this image. Return ONLY a single-line JSON object with no newlines inside string values. Use this exact format: {"name":"","description":"","category":"","servings":2,"prep_time":null,"cook_time":null,"tags":[],"ingredients":[{"name":"","amount":null,"unit":"","category":"Sonstiges"}]} Categories for ingredients: Gemüse, Obst, Fleisch, Fisch, Kühlregal, Milchprodukte, Nudeln, Reis & Getreide, Konserven, Gewürze, Backen, Sonstiges. If no recipe is found return the empty template. ONLY JSON, nothing else.'
+              }
+            ]
+          },
+          {
+            role: 'assistant',
+            content: '{'
+          }
+        ]
       })
     })
 
@@ -49,14 +72,33 @@ Kategorien für Zutaten: Gemüse, Obst, Fleisch, Fisch, Kühlregal, Milchprodukt
     }
 
     const data = await response.json()
-    const text = data.content[0].text.trim()
-    const clean = text.replace(/```json|```/g, '').trim()
-    const recipe = JSON.parse(clean)
+
+    // Claude hat mit { angefangen (prefill) — wir fügen es wieder hinzu
+    const rawText = '{' + data.content[0].text.trim()
+
+    // Bereinigen und parsen
+    let recipe
+    try {
+      recipe = JSON.parse(sanitizeJson(rawText))
+    } catch {
+      // Fallback: JSON-Block extrahieren
+      try {
+        const match = rawText.match(/\{[\s\S]*\}/)
+        if (match) {
+          recipe = JSON.parse(sanitizeJson(match[0]))
+        } else {
+          recipe = emptyRecipe
+        }
+      } catch {
+        recipe = emptyRecipe
+      }
+    }
 
     return new Response(
       JSON.stringify(recipe),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
+
   } catch (error) {
     return new Response(
       JSON.stringify({ error: error.message }),
