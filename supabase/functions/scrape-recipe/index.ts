@@ -3,6 +3,33 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+const parseDuration = (iso: string) => {
+  if (!iso) return null
+  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?/)
+  if (!match) return null
+  return (parseInt(match[1] || '0') * 60) + parseInt(match[2] || '0')
+}
+
+const extractFromJsonLd = (html: string) => {
+  const blocks = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi) || []
+  for (const block of blocks) {
+    try {
+      const content = block.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '').trim()
+      const parsed = JSON.parse(content)
+      const items = Array.isArray(parsed) ? parsed : [parsed]
+      for (const item of items) {
+        if (item['@type'] === 'Recipe') return item
+        if (item['@graph']) {
+          const found = item['@graph'].find((x: any) => x['@type'] === 'Recipe')
+          if (found) return found
+        }
+      }
+    } catch {}
+  }
+  return null
 }
 
 serve(async (req) => {
@@ -14,101 +41,123 @@ serve(async (req) => {
     const { url } = await req.json()
     if (!url) throw new Error('URL fehlt')
 
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MealSync/1.0)' }
-    })
-    const html = await response.text()
-
-    // JSON-LD Schema.org Rezept extrahieren
-    const jsonLdMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)
-    let recipe = null
-
-    if (jsonLdMatch) {
-      for (const block of jsonLdMatch) {
-        try {
-          const content = block.replace(/<script[^>]*>/, '').replace('</script>', '').trim()
-          const parsed = JSON.parse(content)
-          const data = Array.isArray(parsed) ? parsed[0] : parsed
-          const recipeData = data['@graph']
-            ? data['@graph'].find((x: any) => x['@type'] === 'Recipe')
-            : data['@type'] === 'Recipe' ? data : null
-
-          if (recipeData) {
-            recipe = recipeData
-            break
-          }
-        } catch {}
+    // Mehrere Fetch-Strategien versuchen
+    let html = ''
+    const strategies = [
+      // Strategie 1: Direkt mit Browser-Headers
+      async () => {
+        const r = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'de-DE,de;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Referer': 'https://www.google.de/',
+            'Cache-Control': 'no-cache',
+          },
+          signal: AbortSignal.timeout(8000)
+        })
+        return await r.text()
+      },
+      // Strategie 2: Als Googlebot
+      async () => {
+        const r = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+            'Accept': 'text/html',
+          },
+          signal: AbortSignal.timeout(8000)
+        })
+        return await r.text()
       }
+    ]
+
+    for (const strategy of strategies) {
+      try {
+        html = await strategy()
+        if (html.length > 500) break
+      } catch {}
     }
 
-    if (!recipe) {
-      // Fallback: Meta-Tags auslesen
-      const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i)
-      const imageMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/i)
-        || html.match(/<meta[^>]*content="([^"]+)"[^>]*property="og:image"/i)
-      const descMatch = html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/i)
+    if (html.length < 500) {
+      throw new Error('Seite konnte nicht geladen werden. Versuche eine andere URL.')
+    }
+
+    // JSON-LD Schema.org parsen
+    const recipe = extractFromJsonLd(html)
+
+    if (recipe) {
+      const rawIngredients: string[] = recipe.recipeIngredient || []
+      const ingredients = rawIngredients.map((ing: string) => {
+        const clean = ing.trim()
+        const match = clean.match(/^([\d,./½¼¾]+)?\s*([a-zA-ZäöüÄÖÜ]+(?:\s[a-zA-ZäöüÄÖÜ]+)?)?\s+(.+)$/)
+        if (match && match[3]) {
+          return {
+            amount: match[1] ? parseFloat(match[1].replace(',', '.')) : null,
+            unit: match[2]?.trim() || '',
+            name: match[3].trim(),
+            category: 'Sonstiges'
+          }
+        }
+        return { name: clean, amount: null, unit: '', category: 'Sonstiges' }
+      })
+
+      let imageUrl: string | null = null
+      if (recipe.image) {
+        if (typeof recipe.image === 'string') imageUrl = recipe.image
+        else if (recipe.image.url) imageUrl = recipe.image.url
+        else if (Array.isArray(recipe.image)) {
+          imageUrl = typeof recipe.image[0] === 'string' ? recipe.image[0] : recipe.image[0]?.url
+        }
+      }
 
       return new Response(JSON.stringify({
-        name: titleMatch ? titleMatch[1].replace(/\s*[-|].*$/, '').trim() : 'Importiertes Rezept',
-        description: descMatch ? descMatch[1] : '',
-        image_url: imageMatch ? imageMatch[1] : null,
-        ingredients: [],
+        name: recipe.name || 'Importiertes Rezept',
+        description: typeof recipe.description === 'string'
+          ? recipe.description.replace(/<[^>]+>/g, '').trim()
+          : '',
+        image_url: imageUrl,
+        servings: parseInt(recipe.recipeYield) || 2,
+        prep_time: parseDuration(recipe.prepTime),
+        cook_time: parseDuration(recipe.cookTime),
+        category: Array.isArray(recipe.recipeCategory)
+          ? recipe.recipeCategory[0]
+          : recipe.recipeCategory || '',
+        tags: recipe.keywords
+          ? recipe.keywords.split(',').map((k: string) => k.trim()).filter(Boolean)
+          : [],
+        ingredients,
         source_url: url,
-        imported: true,
-        method: 'meta'
+        method: 'schema'
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // Zutaten parsen
-    const rawIngredients = recipe.recipeIngredient || []
-    const ingredients = rawIngredients.map((ing: string) => {
-      const match = ing.trim().match(/^([\d,.\/]+)?\s*([a-zA-ZäöüÄÖÜ]+)?\s+(.+)$/)
-      if (match) {
-        return {
-          amount: match[1] ? parseFloat(match[1].replace(',', '.')) : null,
-          unit: match[2] || '',
-          name: match[3]?.trim() || ing.trim(),
-          category: 'Sonstiges'
-        }
-      }
-      return { name: ing.trim(), amount: null, unit: '', category: 'Sonstiges' }
-    })
+    // Fallback: Meta-Tags
+    const titleMatch = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/i)
+      || html.match(/<title[^>]*>([^<]+)</i)
+    const imageMatch = html.match(/property="og:image"[^>]*content="([^"]+)"/i)
+      || html.match(/content="([^"]+)"[^>]*property="og:image"/i)
+    const descMatch = html.match(/property="og:description"[^>]*content="([^"]+)"/i)
 
-    // Bild URL
-    let imageUrl = null
-    if (recipe.image) {
-      if (typeof recipe.image === 'string') imageUrl = recipe.image
-      else if (recipe.image.url) imageUrl = recipe.image.url
-      else if (Array.isArray(recipe.image)) imageUrl = recipe.image[0]?.url || recipe.image[0]
-    }
-
-    // Kochzeit parsen (ISO 8601: PT30M)
-    const parseDuration = (iso: string) => {
-      if (!iso) return null
-      const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?/)
-      if (!match) return null
-      return (parseInt(match[1] || '0') * 60) + parseInt(match[2] || '0')
-    }
+    const ingMatches = html.match(/itemprop="recipeIngredient"[^>]*>([^<]+)</gi) || []
+    const ingredients = ingMatches.map((m: string) => ({
+      name: m.replace(/itemprop="recipeIngredient"[^>]*>/i, '').replace(/<[^>]+>/g, '').trim(),
+      amount: null, unit: '', category: 'Sonstiges'
+    })).filter((i: any) => i.name)
 
     return new Response(JSON.stringify({
-      name: recipe.name || 'Importiertes Rezept',
-      description: recipe.description || '',
-      image_url: imageUrl,
-      servings: parseInt(recipe.recipeYield) || 2,
-      prep_time: parseDuration(recipe.prepTime),
-      cook_time: parseDuration(recipe.cookTime),
-      category: recipe.recipeCategory || '',
-      tags: recipe.keywords ? recipe.keywords.split(',').map((k: string) => k.trim()) : [],
+      name: titleMatch ? titleMatch[1].replace(/\s*[-|].*$/, '').trim() : 'Importiertes Rezept',
+      description: descMatch ? descMatch[1] : '',
+      image_url: imageMatch ? imageMatch[1] : null,
       ingredients,
       source_url: url,
-      imported: true,
-      method: 'schema'
+      method: ingredients.length > 0 ? 'microdata' : 'meta'
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   }
 })

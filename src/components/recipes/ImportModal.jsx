@@ -4,6 +4,14 @@ import { useAuthStore } from '../../store/useAuthStore'
 import { supabase } from '../../lib/supabase'
 import Papa from 'papaparse'
 
+const KNOWN_SITES = [
+  { name: 'lecker.de', example: 'https://www.lecker.de/rezepte/...' },
+  { name: 'essen.de', example: 'https://www.essen.de/rezepte/...' },
+  { name: 'bbcgoodfood.com', example: 'https://www.bbcgoodfood.com/recipes/...' },
+  { name: 'allrecipes.com', example: 'https://www.allrecipes.com/recipe/...' },
+  { name: 'küchengötter.de', example: 'https://www.kuechengoetter.de/rezepte/...' },
+]
+
 export default function ImportModal({ onClose }) {
   const [tab, setTab] = useState('foto')
   const [url, setUrl] = useState('')
@@ -13,7 +21,14 @@ export default function ImportModal({ onClose }) {
   const household = useAuthStore(s => s.household)
   const { addRecipe } = useRecipeStore()
 
-  // ─── Foto Import via Claude API ───────────────────────────────
+  const tabs = [
+    { key: 'foto', label: '📷 Foto' },
+    { key: 'url', label: '🌐 URL' },
+    { key: 'json', label: '📄 JSON' },
+    { key: 'csv', label: '📊 CSV' },
+  ]
+
+  // ── Foto Import ──────────────────────────────────────────────
   const handleFotoImport = async (e) => {
     const file = e.target.files[0]
     if (!file) return
@@ -29,52 +44,14 @@ export default function ImportModal({ onClose }) {
         reader.readAsDataURL(file)
       })
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1500,
-          messages: [{
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: file.type, data: base64 }
-              },
-              {
-                type: 'text',
-                text: `Extrahiere das Rezept aus diesem Bild vollständig. Antworte NUR mit validem JSON ohne Markdown-Blöcke oder Backticks, exakt in diesem Format:
-{
-  "name": "Rezeptname",
-  "description": "Kurze Beschreibung oder Zubereitungshinweise",
-  "category": "z.B. Pasta, Suppe, Salat",
-  "servings": 2,
-  "prep_time": null,
-  "cook_time": null,
-  "tags": ["tag1", "tag2"],
-  "ingredients": [
-    {"name": "Zutat", "amount": 200, "unit": "g", "category": "Gemüse"}
-  ]
-}
-Kategorien für Zutaten: Gemüse, Obst, Fleisch, Fisch, Kühlregal, Milchprodukte, Nudeln, Reis & Getreide, Konserven, Gewürze, Backen, Getränke, Sonstiges.
-Falls eine Information nicht erkennbar ist, verwende null.`
-              }
-            ]
-          }]
-        })
+      const { data, error } = await supabase.functions.invoke('analyze-recipe-image', {
+        body: { base64, mediaType: file.type }
       })
 
-      if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.error?.message || 'API Fehler')
-      }
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
 
-      const data = await response.json()
-      const text = data.content[0].text.trim()
-      const clean = text.replace(/```json|```/g, '').trim()
-      const recipe = JSON.parse(clean)
-      setPreview(recipe)
+      setPreview(data)
     } catch (err) {
       setResult(`❌ Fehler: ${err.message}`)
     } finally {
@@ -82,7 +59,7 @@ Falls eine Information nicht erkennbar ist, verwende null.`
     }
   }
 
-  // ─── URL Import via Edge Function ────────────────────────────
+  // ── URL Import ───────────────────────────────────────────────
   const handleScrape = async () => {
     if (!url.trim()) return
     setLoading(true)
@@ -93,7 +70,7 @@ Falls eine Information nicht erkennbar ist, verwende null.`
         body: { url: url.trim() }
       })
       if (error) throw error
-      if (data.error) throw new Error(data.error)
+      if (data?.error) throw new Error(data.error)
       setPreview(data)
     } catch (err) {
       setResult(`❌ Fehler: ${err.message}`)
@@ -102,7 +79,7 @@ Falls eine Information nicht erkennbar ist, verwende null.`
     }
   }
 
-  // ─── Vorschau speichern ───────────────────────────────────────
+  // ── Vorschau speichern ───────────────────────────────────────
   const handleSavePreview = async () => {
     if (!preview) return
     setLoading(true)
@@ -118,7 +95,7 @@ Falls eine Information nicht erkennbar ist, verwende null.`
     }
   }
 
-  // ─── JSON Import ──────────────────────────────────────────────
+  // ── JSON Import ──────────────────────────────────────────────
   const handleJSON = async (e) => {
     const file = e.target.files[0]
     if (!file) return
@@ -134,7 +111,7 @@ Falls eine Information nicht erkennbar ist, verwende null.`
     } finally { setLoading(false) }
   }
 
-  // ─── CSV Import ───────────────────────────────────────────────
+  // ── CSV Import ───────────────────────────────────────────────
   const handleCSV = async (e) => {
     const file = e.target.files[0]
     if (!file) return
@@ -147,18 +124,15 @@ Falls eine Information nicht erkennbar ist, verwende null.`
           for (const row of results.data) {
             if (!row.name) continue
             await addRecipe({
-              name: row.name,
-              category: row.category || '',
+              name: row.name, category: row.category || '',
               description: row.description || '',
               tags: row.tags ? row.tags.split(';').map(t => t.trim()) : [],
               servings: Number(row.servings) || 2,
-              prep_time: Number(row.prep_time) || null,
-              cook_time: Number(row.cook_time) || null,
               ingredients: []
             }, household.id)
             count++
           }
-          setResult(`✅ ${count} Rezept(e) aus CSV importiert`)
+          setResult(`✅ ${count} Rezept(e) importiert`)
         } catch (err) {
           setResult(`❌ ${err.message}`)
         } finally { setLoading(false) }
@@ -166,12 +140,86 @@ Falls eine Information nicht erkennbar ist, verwende null.`
     })
   }
 
-  const tabs = [
-    { key: 'foto', label: '📷 Foto' },
-    { key: 'url', label: '🌐 URL' },
-    { key: 'json', label: '📄 JSON' },
-    { key: 'csv', label: '📊 CSV' },
-  ]
+  const PreviewCard = () => (
+    <div style={{
+      background: 'var(--color-surface-2)',
+      borderRadius: '14px', overflow: 'hidden',
+      border: '0.5px solid var(--color-border)',
+      marginTop: '12px'
+    }}>
+      {preview.image_url && (
+        <img src={preview.image_url} alt=""
+          style={{width: '100%', height: '140px', objectFit: 'cover'}} />
+      )}
+      <div style={{padding: '12px'}}>
+        <div style={{
+          fontSize: '11px', fontWeight: '500',
+          color: 'var(--color-accent-text)',
+          background: 'var(--color-accent-soft)',
+          padding: '2px 8px', borderRadius: '20px',
+          display: 'inline-block', marginBottom: '8px'
+        }}>
+          ✨ Erkannt
+        </div>
+        <div style={{
+          fontWeight: '500', fontSize: '15px',
+          color: 'var(--color-text)', marginBottom: '4px'
+        }}>
+          {preview.name}
+        </div>
+        {(preview.category || preview.cook_time) && (
+          <div style={{fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '8px'}}>
+            {preview.category}{preview.cook_time && ` · ${preview.cook_time} min`}
+            {preview.servings && ` · ${preview.servings} Portionen`}
+          </div>
+        )}
+        {preview.ingredients?.length > 0 && (
+          <div style={{marginBottom: '10px'}}>
+            <div style={{fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '5px'}}>
+              {preview.ingredients.length} Zutaten erkannt
+            </div>
+            <div style={{display: 'flex', flexWrap: 'wrap', gap: '4px'}}>
+              {preview.ingredients.slice(0, 6).map((ing, i) => (
+                <span key={i} style={{
+                  fontSize: '11px', padding: '2px 8px',
+                  background: 'var(--color-surface)',
+                  borderRadius: '20px', color: 'var(--color-text-muted)',
+                  border: '0.5px solid var(--color-border)'
+                }}>
+                  {ing.amount && `${ing.amount} `}{ing.unit && `${ing.unit} `}{ing.name}
+                </span>
+              ))}
+              {preview.ingredients.length > 6 && (
+                <span style={{fontSize: '11px', color: 'var(--color-text-muted)', padding: '2px 4px'}}>
+                  +{preview.ingredients.length - 6} weitere
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+        <div style={{display: 'flex', gap: '8px'}}>
+          <button onClick={handleSavePreview} disabled={loading} style={{
+            flex: 1, padding: '10px',
+            background: '#6c63ff', color: '#fff',
+            border: 'none', borderRadius: '10px',
+            cursor: 'pointer', fontSize: '13px', fontWeight: '500',
+            opacity: loading ? 0.6 : 1
+          }}>
+            {loading ? 'Speichere...' : 'Rezept speichern'}
+          </button>
+          <button onClick={() => { setPreview(null); setUrl('') }} style={{
+            padding: '10px 14px',
+            background: 'var(--color-surface)',
+            border: '0.5px solid var(--color-border)',
+            borderRadius: '10px', cursor: 'pointer',
+            fontSize: '13px', color: 'var(--color-text-muted)'
+          }}>
+            Verwerfen
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div style={{
@@ -185,6 +233,7 @@ Falls eine Information nicht erkennbar ist, verwende null.`
         width: '100%', maxHeight: '88vh',
         display: 'flex', flexDirection: 'column'
       }}>
+
         {/* Header */}
         <div style={{
           padding: '16px',
@@ -208,7 +257,11 @@ Falls eine Information nicht erkennbar ist, verwende null.`
           borderBottom: '0.5px solid var(--color-border)'
         }}>
           {tabs.map(t => (
-            <button key={t.key} onClick={() => { setTab(t.key); setPreview(null); setResult(null) }} style={{
+            <button key={t.key} onClick={() => {
+              setTab(t.key)
+              setPreview(null)
+              setResult(null)
+            }} style={{
               flex: 1, padding: '8px 4px',
               borderRadius: '10px', border: 'none',
               cursor: 'pointer', fontSize: '11px', fontWeight: '500',
@@ -226,8 +279,8 @@ Falls eine Information nicht erkennbar ist, verwende null.`
           {/* ── FOTO TAB ── */}
           {tab === 'foto' && (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-              <p style={{fontSize: '13px', color: 'var(--color-text-muted)', lineHeight: '1.5'}}>
-                Fotografiere ein Rezept aus einem Kochbuch, einer Zeitschrift oder mache einen Screenshot — KI erkennt automatisch alle Zutaten und Informationen.
+              <p style={{fontSize: '13px', color: 'var(--color-text-muted)', lineHeight: '1.5', margin: 0}}>
+                Fotografiere ein Rezept aus einem Kochbuch oder Screenshot — KI erkennt automatisch alle Zutaten.
               </p>
 
               {!preview && (
@@ -236,16 +289,13 @@ Falls eine Information nicht erkennbar ist, verwende null.`
                   alignItems: 'center', justifyContent: 'center',
                   gap: '10px', padding: '36px 20px',
                   border: '1.5px dashed var(--color-border)',
-                  borderRadius: '16px', cursor: loading ? 'not-allowed' : 'pointer',
-                  opacity: loading ? 0.6 : 1,
-                  transition: 'border-color 0.15s'
+                  borderRadius: '16px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.6 : 1
                 }}>
-                  <span style={{fontSize: '44px'}}>
-                    {loading ? '⏳' : '📷'}
-                  </span>
+                  <span style={{fontSize: '44px'}}>{loading ? '⏳' : '📷'}</span>
                   <span style={{
-                    fontSize: '14px', fontWeight: '500',
-                    color: 'var(--color-text)'
+                    fontSize: '14px', fontWeight: '500', color: 'var(--color-text)'
                   }}>
                     {loading ? 'KI analysiert Foto...' : 'Foto auswählen'}
                   </span>
@@ -261,102 +311,39 @@ Falls eine Information nicht erkennbar ist, verwende null.`
                 </label>
               )}
 
-              {/* Vorschau nach Foto-Analyse */}
-              {preview && (
-                <div style={{
-                  background: 'var(--color-surface-2)',
-                  borderRadius: '14px', padding: '14px',
-                  border: '0.5px solid var(--color-border)'
-                }}>
-                  <div style={{
-                    fontSize: '11px', fontWeight: '500',
-                    color: 'var(--color-accent-text)',
-                    background: 'var(--color-accent-soft)',
-                    padding: '3px 8px', borderRadius: '20px',
-                    display: 'inline-block', marginBottom: '10px'
-                  }}>
-                    ✨ KI-Erkennung
-                  </div>
-
-                  <div style={{fontWeight: '500', fontSize: '16px', color: 'var(--color-text)', marginBottom: '4px'}}>
-                    {preview.name}
-                  </div>
-
-                  {preview.category && (
-                    <div style={{fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '8px'}}>
-                      {preview.category}
-                      {preview.cook_time && ` · ${preview.cook_time} min`}
-                      {preview.servings && ` · ${preview.servings} Portionen`}
-                    </div>
-                  )}
-
-                  {preview.ingredients?.length > 0 && (
-                    <div style={{marginBottom: '12px'}}>
-                      <div style={{
-                        fontSize: '11px', color: 'var(--color-text-muted)',
-                        marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px'
-                      }}>
-                        {preview.ingredients.length} Zutaten erkannt
-                      </div>
-                      <div style={{display: 'flex', flexWrap: 'wrap', gap: '4px'}}>
-                        {preview.ingredients.slice(0, 8).map((ing, i) => (
-                          <span key={i} style={{
-                            fontSize: '11px', padding: '3px 8px',
-                            background: 'var(--color-surface)',
-                            borderRadius: '20px', color: 'var(--color-text-muted)',
-                            border: '0.5px solid var(--color-border)'
-                          }}>
-                            {ing.amount && `${ing.amount} `}{ing.unit && `${ing.unit} `}{ing.name}
-                          </span>
-                        ))}
-                        {preview.ingredients.length > 8 && (
-                          <span style={{
-                            fontSize: '11px', padding: '3px 8px',
-                            color: 'var(--color-text-muted)'
-                          }}>
-                            +{preview.ingredients.length - 8} weitere
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div style={{display: 'flex', gap: '8px'}}>
-                    <button onClick={handleSavePreview} disabled={loading} style={{
-                      flex: 1, padding: '11px',
-                      background: '#6c63ff', color: '#fff',
-                      border: 'none', borderRadius: '10px',
-                      cursor: 'pointer', fontSize: '13px', fontWeight: '500',
-                      opacity: loading ? 0.6 : 1
-                    }}>
-                      {loading ? 'Speichere...' : 'Rezept speichern'}
-                    </button>
-                    <button onClick={() => setPreview(null)} style={{
-                      padding: '11px 14px',
-                      background: 'var(--color-surface)',
-                      border: '0.5px solid var(--color-border)',
-                      borderRadius: '10px', cursor: 'pointer',
-                      fontSize: '13px', color: 'var(--color-text-muted)'
-                    }}>
-                      Neu
-                    </button>
-                  </div>
-                </div>
-              )}
+              {preview && <PreviewCard />}
             </div>
           )}
 
           {/* ── URL TAB ── */}
           {tab === 'url' && (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-              <p style={{fontSize: '13px', color: 'var(--color-text-muted)'}}>
-                Link zu einem Rezept einfügen — funktioniert mit Seiten die das Schema.org Format nutzen (essen.de, lecker.de, bbcgoodfood.com etc.)
-              </p>
+              <div>
+                <p style={{
+                  fontSize: '13px', color: 'var(--color-text-muted)',
+                  marginBottom: '8px', lineHeight: '1.5'
+                }}>
+                  Funktioniert zuverlässig mit diesen Seiten:
+                </p>
+                <div style={{display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '12px'}}>
+                  {KNOWN_SITES.map(site => (
+                    <span key={site.name} style={{
+                      fontSize: '11px', padding: '3px 8px',
+                      background: 'var(--color-accent-soft)',
+                      color: 'var(--color-accent-text)',
+                      borderRadius: '20px'
+                    }}>
+                      {site.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
               <div style={{display: 'flex', gap: '8px'}}>
                 <input
                   value={url}
                   onChange={e => setUrl(e.target.value)}
-                  placeholder="https://www.lecker.de/rezept/..."
+                  placeholder="https://www.lecker.de/rezepte/..."
                   style={{
                     flex: 1, padding: '10px 14px',
                     background: 'var(--color-input)',
@@ -375,61 +362,17 @@ Falls eine Information nicht erkennbar ist, verwende null.`
                 </button>
               </div>
 
-              {preview && (
-                <div style={{
-                  background: 'var(--color-surface-2)',
-                  borderRadius: '14px', overflow: 'hidden',
-                  border: '0.5px solid var(--color-border)'
-                }}>
-                  {preview.image_url && (
-                    <img
-                      src={preview.image_url} alt=""
-                      style={{width: '100%', height: '140px', objectFit: 'cover'}}
-                    />
-                  )}
-                  <div style={{padding: '12px'}}>
-                    <div style={{fontWeight: '500', fontSize: '15px', color: 'var(--color-text)', marginBottom: '4px'}}>
-                      {preview.name}
-                    </div>
-                    {preview.category && (
-                      <div style={{fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '8px'}}>
-                        {preview.category}{preview.cook_time && ` · ${preview.cook_time} min`}
-                      </div>
-                    )}
-                    {preview.ingredients?.length > 0 && (
-                      <div style={{fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '10px'}}>
-                        {preview.ingredients.length} Zutaten erkannt
-                      </div>
-                    )}
-                    <div style={{display: 'flex', gap: '8px'}}>
-                      <button onClick={handleSavePreview} disabled={loading} style={{
-                        flex: 1, padding: '10px',
-                        background: '#6c63ff', color: '#fff',
-                        border: 'none', borderRadius: '10px',
-                        cursor: 'pointer', fontSize: '13px', fontWeight: '500'
-                      }}>
-                        Rezept speichern
-                      </button>
-                      <button onClick={() => { setPreview(null); setUrl('') }} style={{
-                        padding: '10px 14px',
-                        background: 'var(--color-surface)',
-                        border: '0.5px solid var(--color-border)',
-                        borderRadius: '10px', cursor: 'pointer',
-                        fontSize: '13px', color: 'var(--color-text-muted)'
-                      }}>
-                        Verwerfen
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {preview && <PreviewCard />}
             </div>
           )}
 
           {/* ── JSON TAB ── */}
           {tab === 'json' && (
             <div>
-              <p style={{fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '12px'}}>
+              <p style={{
+                fontSize: '13px', color: 'var(--color-text-muted)',
+                marginBottom: '12px'
+              }}>
                 JSON-Datei im MealSync-Format importieren.
               </p>
               <label style={{
@@ -442,12 +385,9 @@ Falls eine Information nicht erkennbar ist, verwende null.`
                 <span style={{fontSize: '13px', color: 'var(--color-text-muted)'}}>
                   {loading ? 'Importiere...' : 'JSON-Datei auswählen'}
                 </span>
-                <input
-                  type="file" accept=".json"
+                <input type="file" accept=".json"
                   onChange={handleJSON}
-                  style={{display: 'none'}}
-                  disabled={loading}
-                />
+                  style={{display: 'none'}} disabled={loading} />
               </label>
             </div>
           )}
@@ -455,10 +395,14 @@ Falls eine Information nicht erkennbar ist, verwende null.`
           {/* ── CSV TAB ── */}
           {tab === 'csv' && (
             <div>
-              <p style={{fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '4px'}}>
-                CSV mit Spalten: name, category, description, tags, servings, prep_time, cook_time
+              <p style={{
+                fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '4px'
+              }}>
+                CSV mit Spalten: name, category, description, tags, servings
               </p>
-              <p style={{fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '12px'}}>
+              <p style={{
+                fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '12px'
+              }}>
                 Tags mit Semikolon trennen: vegetarisch;schnell
               </p>
               <label style={{
@@ -471,12 +415,9 @@ Falls eine Information nicht erkennbar ist, verwende null.`
                 <span style={{fontSize: '13px', color: 'var(--color-text-muted)'}}>
                   {loading ? 'Importiere...' : 'CSV-Datei auswählen'}
                 </span>
-                <input
-                  type="file" accept=".csv"
+                <input type="file" accept=".csv"
                   onChange={handleCSV}
-                  style={{display: 'none'}}
-                  disabled={loading}
-                />
+                  style={{display: 'none'}} disabled={loading} />
               </label>
             </div>
           )}
@@ -503,6 +444,7 @@ Falls eine Information nicht erkennbar ist, verwende null.`
               Fertig
             </button>
           )}
+
         </div>
       </div>
     </div>

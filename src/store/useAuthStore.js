@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 
-export const useAuthStore = create((set) => ({
+export const useAuthStore = create((set, get) => ({
   user: null,
   household: null,
   loading: true,
@@ -12,29 +12,58 @@ export const useAuthStore = create((set) => ({
     set({ user, loading: false })
 
     if (user) {
-      // Haushalt des Users laden
-      const { data } = await supabase
-        .from('household_members')
-        .select('households(*)')
-        .eq('user_id', user.id)
-        .single()
-      set({ household: data?.households ?? null })
+      await get()._loadOrCreateHousehold(user.id)
     }
 
     supabase.auth.onAuthStateChange(async (_event, session) => {
       const user = session?.user ?? null
       set({ user })
       if (user) {
-        const { data } = await supabase
-          .from('household_members')
-          .select('households(*)')
-          .eq('user_id', user.id)
-          .single()
-        set({ household: data?.households ?? null })
+        await get()._loadOrCreateHousehold(user.id)
       } else {
         set({ household: null })
       }
     })
+  },
+
+  _loadOrCreateHousehold: async (userId) => {
+    const { data: membership } = await supabase
+      .from('household_members')
+      .select('households(*)')
+      .eq('user_id', userId)
+      .single()
+
+    if (membership?.households) {
+      set({ household: membership.households })
+      return
+    }
+
+    const { data: existing } = await supabase
+      .from('households')
+      .select()
+      .eq('name', 'Haushalt')
+      .single()
+
+    if (existing) {
+      await supabase.from('household_members').insert({
+        household_id: existing.id,
+        user_id: userId,
+        role: 'member'
+      })
+      set({ household: existing })
+    } else {
+      const { data: newHousehold } = await supabase
+        .from('households')
+        .insert({ name: 'Haushalt', code: 'HAUS01' })
+        .select()
+        .single()
+      await supabase.from('household_members').insert({
+        household_id: newHousehold.id,
+        user_id: userId,
+        role: 'owner'
+      })
+      set({ household: newHousehold })
+    }
   },
 
   signIn: async (email, password) => {
@@ -50,41 +79,6 @@ export const useAuthStore = create((set) => ({
   signOut: async () => {
     await supabase.auth.signOut()
     set({ user: null, household: null })
-  },
-
-  createHousehold: async (name) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase()
-    const { data: household, error } = await supabase
-      .from('households')
-      .insert({ name, code })
-      .select()
-      .single()
-    if (error) throw error
-    await supabase.from('household_members').insert({
-      household_id: household.id,
-      user_id: user.id,
-      role: 'owner'
-    })
-    set({ household })
-    return household
-  },
-
-  joinHousehold: async (code) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: household, error } = await supabase
-      .from('households')
-      .select()
-      .eq('code', code.toUpperCase())
-      .single()
-    if (error || !household) throw new Error('Haushaltscode nicht gefunden')
-    await supabase.from('household_members').insert({
-      household_id: household.id,
-      user_id: user.id,
-      role: 'member'
-    })
-    set({ household })
-    return household
   },
 
   setHousehold: (household) => set({ household })
