@@ -2,10 +2,54 @@ import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 
 const CATEGORIES_ORDER = [
-  'Gemüse', 'Obst', 'Fleisch', 'Fisch', 'Kühlregal',
-  'Milchprodukte', 'Nudeln', 'Reis & Getreide', 'Konserven',
-  'Gewürze', 'Backen', 'Getränke', 'Tiefkühl', 'Sonstiges'
+  'Obst & Gemüse',
+  'Fleisch & Fisch',
+  'Kühlregal',
+  'Milchprodukte',
+  'Brot & Backwaren',
+  'Nudeln',
+  'Reis & Getreide',
+  'Konserven',
+  'Gewürze',
+  'Backen',
+  'Getränke',
+  'Tiefkühl',
+  'Sonstiges'
 ]
+
+// Mapping alte Kategorien → neue Supermarkt-Gang Kategorien
+const CATEGORY_MAP = {
+  'Gemüse': 'Obst & Gemüse',
+  'Obst': 'Obst & Gemüse',
+  'Fleisch': 'Fleisch & Fisch',
+  'Fisch': 'Fleisch & Fisch',
+  'Milchprodukte': 'Milchprodukte',
+  'Kühlregal': 'Kühlregal',
+  'Nudeln': 'Nudeln',
+  'Reis & Getreide': 'Reis & Getreide',
+  'Konserven': 'Konserven',
+  'Gewürze': 'Gewürze',
+  'Backen': 'Backen',
+  'Getränke': 'Getränke',
+  'Tiefkühl': 'Tiefkühl',
+  'Sonstiges': 'Sonstiges'
+}
+
+const normalizeCategory = (cat) => CATEGORY_MAP[cat] || cat || 'Sonstiges'
+
+const BASIC_INGREDIENTS = [
+  'salz', 'pfeffer', 'zucker', 'wasser', 'öl', 'olivenöl',
+  'butter', 'mehl', 'essig', 'backpulver', 'natron',
+  'speisestärke', 'senf', 'schwarzer pfeffer', 'weißer pfeffer',
+  'salz und pfeffer', 'speiseöl', 'sonnenblumenöl', 'rapsöl',
+  'pflanzenöl', 'margarine'
+]
+
+export const isBasicIngredient = (name) =>
+  BASIC_INGREDIENTS.some(b =>
+    name.toLowerCase().trim() === b ||
+    name.toLowerCase().trim().startsWith(b + ' ')
+  )
 
 export const useShoppingStore = create((set, get) => ({
   list: null,
@@ -45,35 +89,42 @@ export const useShoppingStore = create((set, get) => ({
     const { list } = get()
     if (!list) return
 
-    // Nur auto-generierte Items löschen, manuelle behalten
     await supabase.from('shopping_items')
       .delete()
       .eq('list_id', list.id)
       .eq('is_manual', false)
 
-    // Zutaten zusammenfassen
+    // Zutaten zusammenfassen mit Portions-Skalierung
     const itemMap = {}
     entries.forEach(entry => {
       if (!entry.recipes?.ingredients) return
       const factor = (entry.servings || 2) / (entry.recipes.servings || 2)
       entry.recipes.ingredients?.forEach(ing => {
-        const key = `${ing.name.toLowerCase()}__${ing.unit || ''}`
+        if (!ing.name?.trim()) return
+        const key = `${ing.name.toLowerCase().trim()}__${ing.unit || ''}`
         if (itemMap[key]) {
-          itemMap[key].amount = (itemMap[key].amount || 0) + (ing.amount || 0) * factor
+          itemMap[key].amount = itemMap[key].amount != null && ing.amount != null
+            ? Math.round((itemMap[key].amount + ing.amount * factor) * 10) / 10
+            : itemMap[key].amount
+          // Gerichte merken für Zusammenfassung
+          if (!itemMap[key].sources.includes(entry.recipes.name)) {
+            itemMap[key].sources.push(entry.recipes.name)
+          }
         } else {
           itemMap[key] = {
             list_id: list.id,
-            name: ing.name,
-            amount: ing.amount ? ing.amount * factor : null,
+            name: ing.name.trim(),
+            amount: ing.amount != null ? Math.round(ing.amount * factor * 10) / 10 : null,
             unit: ing.unit || null,
-            category: ing.category || 'Sonstiges',
-            is_manual: false
+            category: normalizeCategory(ing.category),
+            is_manual: false,
+            sources: [entry.recipes.name]
           }
         }
       })
     })
 
-    const newItems = Object.values(itemMap)
+    const newItems = Object.values(itemMap).map(({ sources, ...item }) => item)
     if (newItems.length > 0) {
       await supabase.from('shopping_items').insert(newItems)
     }
@@ -85,8 +136,9 @@ export const useShoppingStore = create((set, get) => ({
     const { list, items } = get()
     const { data } = await supabase.from('shopping_items').insert({
       list_id: list.id,
-      name, amount: amount || null, unit: unit || null,
-      category: category || 'Sonstiges',
+      name, amount: amount || null,
+      unit: unit || null,
+      category: normalizeCategory(category || 'Sonstiges'),
       is_manual: true
     }).select().single()
     set({ items: [...items, data] })
@@ -111,30 +163,34 @@ export const useShoppingStore = create((set, get) => ({
     set({ items: get().items.filter(i => i.id !== itemId) })
   },
 
-  getGroupedItems: () => {
-    const items = get().items
+  getGroupedItems: (showBasics = false) => {
+    const items = get().items.filter(i =>
+      showBasics || !isBasicIngredient(i.name)
+    )
     const groups = {}
     items.forEach(item => {
-      const cat = item.category || 'Sonstiges'
+      const cat = normalizeCategory(item.category || 'Sonstiges')
       if (!groups[cat]) groups[cat] = []
       groups[cat].push(item)
     })
-    // Nach definierter Reihenfolge sortieren
-    return CATEGORIES_ORDER
-      .filter(cat => groups[cat])
-      .map(cat => ({ category: cat, items: groups[cat] }))
-      .concat(
-        Object.keys(groups)
-          .filter(cat => !CATEGORIES_ORDER.includes(cat))
-          .map(cat => ({ category: cat, items: groups[cat] }))
-      )
+    // Nach Supermarkt-Gang sortieren
+    return [
+      ...CATEGORIES_ORDER.filter(cat => groups[cat]).map(cat => ({
+        category: cat,
+        items: groups[cat]
+      })),
+      ...Object.keys(groups)
+        .filter(cat => !CATEGORIES_ORDER.includes(cat))
+        .map(cat => ({ category: cat, items: groups[cat] }))
+    ]
   },
 
   refreshItems: async () => {
     const { list } = get()
     if (!list) return
     const { data } = await supabase
-      .from('shopping_items').select().eq('list_id', list.id).order('category')
+      .from('shopping_items').select()
+      .eq('list_id', list.id).order('category')
     set({ items: data || [] })
   }
 }))
