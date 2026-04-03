@@ -5,7 +5,7 @@ import { usePlanStore } from '../store/usePlanStore'
 import { useRecipeStore } from '../store/useRecipeStore'
 import { useAuthStore } from '../store/useAuthStore'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Plus, X, ChefHat, FileText } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X, ChefHat, FileText, Users } from 'lucide-react'
 
 const DAYS = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
 const DAYS_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
@@ -13,11 +13,16 @@ const DAYS_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 export default function WeekPlanner() {
   const navigate = useNavigate()
   const household = useAuthStore(s => s.household)
-  const { currentWeekStart, entries, fetchPlan, setWeek, addEntry, removeEntry, loading } = usePlanStore()
+  const {
+    currentWeekStart, entries, fetchPlan, setWeek,
+    addEntry, removeEntry, updateServings, loading
+  } = usePlanStore()
   const { recipes, fetchRecipes } = useRecipeStore()
   const [modal, setModal] = useState(false)
   const [selectedDay, setSelectedDay] = useState(null)
-  const [activeDay, setActiveDay] = useState(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1)
+  const [activeDay, setActiveDay] = useState(
+    new Date().getDay() === 0 ? 6 : new Date().getDay() - 1
+  )
   const [search, setSearch] = useState('')
   const [noteMode, setNoteMode] = useState(false)
   const [noteText, setNoteText] = useState('')
@@ -44,7 +49,7 @@ export default function WeekPlanner() {
   )
 
   const handleSelectRecipe = async (recipe) => {
-    await addEntry(selectedDay + 1, 'dinner', recipe.id, recipe.name)
+    await addEntry(selectedDay + 1, 'dinner', recipe.id, recipe.name, recipe.servings || 2)
     setModal(false)
     setSearch('')
   }
@@ -65,10 +70,24 @@ export default function WeekPlanner() {
     setNoteMode(true)
   }
 
+  const handleServingsChange = async (entry, delta) => {
+    const newServings = Math.max(1, (entry.servings || 2) + delta)
+    await updateServings(entry.id, newServings)
+  }
+
   const entry = getEntry(activeDay)
   const noteEntry = getNoteEntry(activeDay)
-  const hasSteps = entry?.recipes?.recipe_steps?.length > 0 ||
-    recipes.find(r => r.id === entry?.recipe_id)?.recipe_steps?.length > 0
+
+  // Berechne skalierte Zutaten
+  const getScaledIngredients = (entry) => {
+    if (!entry?.recipes?.ingredients?.length) return []
+    const recipe = entry.recipes
+    const factor = (entry.servings || 2) / (recipe.servings || 2)
+    return recipe.ingredients.map(ing => ({
+      ...ing,
+      amount: ing.amount ? Math.round(ing.amount * factor * 10) / 10 : null
+    }))
+  }
 
   return (
     <div style={{padding: '16px', paddingBottom: '80px'}}>
@@ -90,17 +109,16 @@ export default function WeekPlanner() {
         </button>
 
         <div style={{textAlign: 'center'}}>
-          <div style={{
-            fontSize: '14px', fontWeight: '500',
-            color: 'var(--color-text)'
-          }}>
+          <div style={{fontSize: '14px', fontWeight: '500', color: 'var(--color-text)'}}>
             {format(weekStart, 'd. MMM', { locale: de })} –{' '}
             {format(addDays(weekStart, 6), 'd. MMM yyyy', { locale: de })}
           </div>
-          <button onClick={() => { setWeek(new Date()); setActiveDay(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1) }} style={{
+          <button onClick={() => {
+            setWeek(new Date())
+            setActiveDay(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1)
+          }} style={{
             fontSize: '11px', color: 'var(--color-accent)',
-            background: 'none', border: 'none',
-            cursor: 'pointer', marginTop: '2px'
+            background: 'none', border: 'none', cursor: 'pointer', marginTop: '2px'
           }}>
             Heute
           </button>
@@ -121,8 +139,7 @@ export default function WeekPlanner() {
       {/* Tag-Chips */}
       <div style={{
         display: 'flex', gap: '6px',
-        marginBottom: '20px', overflowX: 'auto',
-        paddingBottom: '4px'
+        marginBottom: '20px', overflowX: 'auto', paddingBottom: '4px'
       }}>
         {weekDays.map((day, i) => {
           const hasEntry = !!getEntry(i)
@@ -133,10 +150,9 @@ export default function WeekPlanner() {
             <button key={i} onClick={() => setActiveDay(i)} style={{
               minWidth: '44px', padding: '8px 4px',
               borderRadius: '14px', border: 'none',
-              cursor: 'pointer', textAlign: 'center',
-              flexShrink: 0,
+              cursor: 'pointer', textAlign: 'center', flexShrink: 0,
               background: isActive ? 'var(--color-accent)' : 'var(--color-surface)',
-              boxShadow: isActive ? '0 2px 8px rgba(108,99,255,0.3)' : 'none',
+              boxShadow: isActive ? '0 2px 8px rgba(88,86,214,0.3)' : 'none',
               transition: 'all 0.15s'
             }}>
               <span style={{
@@ -152,7 +168,10 @@ export default function WeekPlanner() {
               }}>
                 {format(day, 'd')}
               </span>
-              <div style={{display: 'flex', justifyContent: 'center', gap: '2px', marginTop: '4px'}}>
+              <div style={{
+                display: 'flex', justifyContent: 'center',
+                gap: '2px', marginTop: '4px'
+              }}>
                 {hasEntry && <div style={{
                   width: '4px', height: '4px', borderRadius: '50%',
                   background: isActive ? 'rgba(255,255,255,0.8)' : 'var(--color-accent)'
@@ -167,9 +186,11 @@ export default function WeekPlanner() {
         })}
       </div>
 
-      {/* Aktiver Tag */}
       {loading ? (
-        <p style={{color: 'var(--color-text-muted)', textAlign: 'center', padding: '32px'}}>
+        <p style={{
+          color: 'var(--color-text-muted)',
+          textAlign: 'center', padding: '32px'
+        }}>
           Lädt...
         </p>
       ) : (
@@ -184,7 +205,7 @@ export default function WeekPlanner() {
             {DAYS[activeDay]}, {format(weekDays[activeDay], 'd. MMMM', { locale: de })}
           </div>
 
-          {/* Gericht */}
+          {/* Gericht Card */}
           <div style={{
             background: 'var(--color-surface)',
             border: '0.5px solid var(--color-border)',
@@ -203,68 +224,165 @@ export default function WeekPlanner() {
             </div>
 
             {entry ? (
-              <div style={{padding: '14px', display: 'flex', alignItems: 'center', gap: '12px'}}>
+              <div>
+                {/* Gericht Info */}
                 <div style={{
-                  width: '44px', height: '44px', borderRadius: '12px',
-                  background: 'var(--color-accent-soft)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '22px', flexShrink: 0, overflow: 'hidden'
+                  padding: '14px',
+                  display: 'flex', alignItems: 'center', gap: '12px'
                 }}>
-                  {entry.recipes?.image_url
-                    ? <img src={entry.recipes.image_url} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
-                    : '🍳'}
-                </div>
-                <div style={{flex: 1, minWidth: 0}}>
                   <div style={{
-                    fontWeight: '600', fontSize: '15px',
-                    color: 'var(--color-text)',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                    width: '44px', height: '44px', borderRadius: '12px',
+                    background: 'var(--color-accent-soft)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '22px', flexShrink: 0, overflow: 'hidden'
                   }}>
-                    {entry.recipes?.name || entry.custom_name}
+                    {entry.recipes?.image_url
+                      ? <img src={entry.recipes.image_url}
+                          style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                      : '🍳'}
                   </div>
-                  {entry.recipes?.category && (
-                    <div style={{fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px'}}>
-                      {entry.recipes.category}
+                  <div style={{flex: 1, minWidth: 0}}>
+                    <div style={{
+                      fontWeight: '600', fontSize: '15px', color: 'var(--color-text)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                    }}>
+                      {entry.recipes?.name || entry.custom_name}
                     </div>
-                  )}
-                </div>
-                <div style={{display: 'flex', gap: '6px'}}>
-                  {/* Kochen Button */}
-                  <button
-                    onClick={() => navigate(`/cook/${entry.recipe_id}`)}
-                    style={{
+                    {entry.recipes?.category && (
+                      <div style={{
+                        fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px'
+                      }}>
+                        {entry.recipes.category}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{display: 'flex', gap: '6px'}}>
+                    <button onClick={() => navigate(`/cook/${entry.recipe_id}`)} style={{
                       padding: '8px 12px',
-                      background: 'var(--color-accent)',
-                      color: '#fff', border: 'none',
-                      borderRadius: '10px', cursor: 'pointer',
+                      background: 'var(--color-accent)', color: '#fff',
+                      border: 'none', borderRadius: '10px', cursor: 'pointer',
                       fontSize: '12px', fontWeight: '500',
                       display: 'flex', alignItems: 'center', gap: '4px'
-                    }}
-                  >
-                    <ChefHat size={13} />
-                    Kochen
-                  </button>
-                  <button onClick={() => removeEntry(entry.id)} style={{
-                    width: '32px', height: '32px',
-                    background: 'var(--color-surface-2)',
-                    border: '0.5px solid var(--color-border)',
-                    borderRadius: '8px', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'var(--color-text-muted)'
-                  }}>
-                    <X size={15} />
-                  </button>
+                    }}>
+                      <ChefHat size={13} /> Kochen
+                    </button>
+                    <button onClick={() => removeEntry(entry.id)} style={{
+                      width: '32px', height: '32px',
+                      background: 'var(--color-surface-2)',
+                      border: '0.5px solid var(--color-border)',
+                      borderRadius: '8px', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: 'var(--color-text-muted)'
+                    }}>
+                      <X size={15} />
+                    </button>
+                  </div>
                 </div>
+
+                {/* Portionsanpassung */}
+                <div style={{
+                  padding: '10px 14px',
+                  borderTop: '0.5px solid var(--color-border)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    fontSize: '13px', color: 'var(--color-text-muted)'
+                  }}>
+                    <Users size={14} />
+                    Portionen
+                    {entry.recipes?.servings && entry.servings !== entry.recipes.servings && (
+                      <span style={{
+                        fontSize: '10px', padding: '1px 6px',
+                        background: 'var(--color-accent-soft)',
+                        color: 'var(--color-accent-text)',
+                        borderRadius: '20px'
+                      }}>
+                        Rezept: {entry.recipes.servings}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                    <button
+                      onClick={() => handleServingsChange(entry, -1)}
+                      style={{
+                        width: '28px', height: '28px', borderRadius: '8px',
+                        background: 'var(--color-surface-2)',
+                        border: '0.5px solid var(--color-border)',
+                        cursor: 'pointer', fontSize: '16px', color: 'var(--color-text)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}
+                    >−</button>
+                    <span style={{
+                      fontSize: '16px', fontWeight: '600',
+                      color: 'var(--color-text)', minWidth: '20px', textAlign: 'center'
+                    }}>
+                      {entry.servings || 2}
+                    </span>
+                    <button
+                      onClick={() => handleServingsChange(entry, +1)}
+                      style={{
+                        width: '28px', height: '28px', borderRadius: '8px',
+                        background: 'var(--color-surface-2)',
+                        border: '0.5px solid var(--color-border)',
+                        cursor: 'pointer', fontSize: '16px', color: 'var(--color-text)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}
+                    >+</button>
+                  </div>
+                </div>
+
+                {/* Skalierte Zutaten */}
+                {getScaledIngredients(entry).length > 0 && (
+                  <div style={{
+                    padding: '10px 14px',
+                    borderTop: '0.5px solid var(--color-border)',
+                    background: 'var(--color-surface-2)'
+                  }}>
+                    <div style={{
+                      fontSize: '11px', fontWeight: '600',
+                      color: 'var(--color-text-muted)',
+                      textTransform: 'uppercase', letterSpacing: '0.5px',
+                      marginBottom: '8px'
+                    }}>
+                      Zutaten für {entry.servings || 2} Portionen
+                      {entry.servings !== entry.recipes?.servings && (
+                        <span style={{
+                          marginLeft: '6px', fontSize: '10px',
+                          color: 'var(--color-accent)', fontWeight: '500',
+                          textTransform: 'none'
+                        }}>
+                          (angepasst)
+                        </span>
+                      )}
+                    </div>
+                    <div style={{display: 'flex', flexWrap: 'wrap', gap: '5px'}}>
+                      {getScaledIngredients(entry).map((ing, i) => (
+                        <span key={i} style={{
+                          fontSize: '12px', padding: '3px 8px',
+                          background: 'var(--color-surface)',
+                          borderRadius: '20px', color: 'var(--color-text-muted)',
+                          border: '0.5px solid var(--color-border)'
+                        }}>
+                          {ing.amount && `${ing.amount} `}
+                          {ing.unit && `${ing.unit} `}
+                          {ing.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
-              <button onClick={() => { setSelectedDay(activeDay); setModal(true) }} style={{
-                width: '100%', padding: '16px',
-                background: 'none', border: 'none',
-                cursor: 'pointer', display: 'flex',
-                alignItems: 'center', justifyContent: 'center',
-                gap: '8px', color: 'var(--color-text-muted)',
-                fontSize: '14px'
-              }}>
+              <button
+                onClick={() => { setSelectedDay(activeDay); setModal(true) }}
+                style={{
+                  width: '100%', padding: '16px',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  gap: '8px', color: 'var(--color-text-muted)', fontSize: '14px'
+                }}
+              >
                 <div style={{
                   width: '28px', height: '28px', borderRadius: '8px',
                   background: 'var(--color-accent-soft)',
@@ -289,8 +407,7 @@ export default function WeekPlanner() {
               fontSize: '11px', fontWeight: '600',
               color: 'var(--color-text-muted)',
               textTransform: 'uppercase', letterSpacing: '0.5px',
-              display: 'flex', alignItems: 'center',
-              justifyContent: 'space-between'
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between'
             }}>
               <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
                 <FileText size={12} />
@@ -311,17 +428,15 @@ export default function WeekPlanner() {
                 <textarea
                   value={noteText}
                   onChange={e => setNoteText(e.target.value)}
-                  placeholder="z.B. Beilage: Baguette, ohne Knoblauch, extra scharf..."
-                  rows={3}
-                  autoFocus
+                  placeholder="z.B. Beilage: Baguette, ohne Knoblauch..."
+                  rows={3} autoFocus
                   style={{
                     width: '100%', padding: '10px 12px',
                     background: 'var(--color-surface-2)',
                     border: '0.5px solid var(--color-border)',
                     borderRadius: '10px', fontSize: '13px',
                     color: 'var(--color-text)', outline: 'none',
-                    resize: 'none', boxSizing: 'border-box',
-                    lineHeight: '1.5'
+                    resize: 'none', boxSizing: 'border-box', lineHeight: '1.5'
                   }}
                 />
                 <div style={{display: 'flex', gap: '8px', marginTop: '8px'}}>
@@ -361,8 +476,7 @@ export default function WeekPlanner() {
             <div style={{
               fontSize: '11px', fontWeight: '600',
               color: 'var(--color-text-muted)',
-              textTransform: 'uppercase', letterSpacing: '0.5px',
-              marginBottom: '8px'
+              textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px'
             }}>
               Wochenübersicht
             </div>
@@ -406,8 +520,19 @@ export default function WeekPlanner() {
                       </div>
                     )}
                   </div>
+                  {e && (
+                    <span style={{
+                      fontSize: '11px', color: 'var(--color-text-muted)',
+                      flexShrink: 0, display: 'flex', alignItems: 'center', gap: '3px'
+                    }}>
+                      <Users size={11} />
+                      {e.servings || 2}
+                    </span>
+                  )}
                   {!e && (
-                    <span style={{fontSize: '11px', color: 'var(--color-accent)', flexShrink: 0}}>
+                    <span style={{
+                      fontSize: '11px', color: 'var(--color-accent)', flexShrink: 0
+                    }}>
                       + hinzufügen
                     </span>
                   )}
@@ -458,12 +583,14 @@ export default function WeekPlanner() {
                 color: 'var(--color-text-muted)'
               }}>×</button>
             </div>
-            <div style={{padding: '12px 16px', borderBottom: '0.5px solid var(--color-border)'}}>
+            <div style={{
+              padding: '12px 16px',
+              borderBottom: '0.5px solid var(--color-border)'
+            }}>
               <input
                 type="text" value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Suchen..."
-                autoFocus
+                placeholder="Suchen..." autoFocus
                 style={{
                   width: '100%', padding: '10px 14px',
                   background: 'var(--color-surface-2)',
@@ -479,30 +606,37 @@ export default function WeekPlanner() {
                 <button key={recipe.id} onClick={() => handleSelectRecipe(recipe)} style={{
                   width: '100%', textAlign: 'left',
                   padding: '12px', borderRadius: '12px',
-                  background: 'none', border: 'none',
-                  cursor: 'pointer', display: 'flex',
-                  alignItems: 'center', gap: '12px'
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '12px'
                 }}>
                   <div style={{
                     width: '40px', height: '40px', borderRadius: '10px',
                     background: 'var(--color-surface-2)',
-                    display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', fontSize: '20px',
-                    flexShrink: 0, overflow: 'hidden'
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '20px', flexShrink: 0, overflow: 'hidden'
                   }}>
                     {recipe.image_url
-                      ? <img src={recipe.image_url} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                      ? <img src={recipe.image_url}
+                          style={{width: '100%', height: '100%', objectFit: 'cover'}} />
                       : '🍳'}
                   </div>
-                  <div>
-                    <div style={{fontSize: '14px', fontWeight: '500', color: 'var(--color-text)'}}>
+                  <div style={{flex: 1}}>
+                    <div style={{
+                      fontSize: '14px', fontWeight: '500', color: 'var(--color-text)'
+                    }}>
                       {recipe.name}
                     </div>
-                    {recipe.category && (
-                      <div style={{fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px'}}>
-                        {recipe.category}
-                      </div>
-                    )}
+                    <div style={{
+                      fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px',
+                      display: 'flex', gap: '8px'
+                    }}>
+                      {recipe.category && <span>{recipe.category}</span>}
+                      {recipe.servings && (
+                        <span style={{display: 'flex', alignItems: 'center', gap: '3px'}}>
+                          <Users size={10} /> {recipe.servings}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </button>
               ))}

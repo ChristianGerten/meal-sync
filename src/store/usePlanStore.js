@@ -25,7 +25,6 @@ export const usePlanStore = create((set, get) => ({
     set({ loading: true })
     weekStart = weekStart || get().currentWeekStart
 
-    // Plan holen oder erstellen
     let { data: plan } = await supabase
       .from('meal_plans')
       .select()
@@ -42,10 +41,9 @@ export const usePlanStore = create((set, get) => ({
       plan = newPlan
     }
 
-    // Einträge mit Rezepten laden
     const { data: entries } = await supabase
       .from('meal_plan_entries')
-      .select('*, recipes(id, name, category, image_url, servings)')
+      .select('*, recipes(id, name, category, image_url, servings, ingredients(*))')
       .eq('plan_id', plan.id)
 
     set({ currentPlan: plan, entries: entries || [], loading: false })
@@ -54,7 +52,6 @@ export const usePlanStore = create((set, get) => ({
   addEntry: async (day, mealType, recipeId, recipeName, servings = 2) => {
     const { currentPlan, entries } = get()
 
-    // Existierenden Eintrag löschen (nur einer pro Slot)
     const existing = entries.find(
       e => e.day_of_week === day && e.meal_type === mealType
     )
@@ -72,10 +69,28 @@ export const usePlanStore = create((set, get) => ({
         servings,
         custom_name: recipeId ? null : recipeName
       })
-      .select('*, recipes(id, name, category, image_url, servings)')
+      .select('*, recipes(id, name, category, image_url, servings, ingredients(*))')
       .single()
 
-    set({ entries: [...get().entries.filter(e => e.id !== existing?.id), entry] })
+    set({
+      entries: [
+        ...get().entries.filter(e => e.id !== existing?.id),
+        entry
+      ]
+    })
+  },
+
+  updateServings: async (entryId, servings) => {
+    await supabase
+      .from('meal_plan_entries')
+      .update({ servings })
+      .eq('id', entryId)
+
+    set({
+      entries: get().entries.map(e =>
+        e.id === entryId ? { ...e, servings } : e
+      )
+    })
   },
 
   removeEntry: async (entryId) => {
@@ -83,13 +98,12 @@ export const usePlanStore = create((set, get) => ({
     set({ entries: get().entries.filter(e => e.id !== entryId) })
   },
 
-  // Wird vom Realtime-Hook aufgerufen
   refreshEntries: async () => {
     const { currentPlan } = get()
     if (!currentPlan) return
     const { data } = await supabase
       .from('meal_plan_entries')
-      .select('*, recipes(id, name, category, image_url, servings)')
+      .select('*, recipes(id, name, category, image_url, servings, ingredients(*))')
       .eq('plan_id', currentPlan.id)
     set({ entries: data || [] })
   }
