@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useRecipeStore } from '../store/useRecipeStore'
+import { useAuthStore } from '../store/useAuthStore'
+import { useCookHistoryStore } from '../store/useCookHistoryStore'
 import { ArrowLeft, ArrowRight, Check, X, Timer, Play, Pause, RotateCcw } from 'lucide-react'
 
 const TIMER_PRESETS = [5, 10, 15, 20, 30]
@@ -11,7 +13,6 @@ function TimerWidget() {
   const [running, setRunning] = useState(false)
   const [finished, setFinished] = useState(false)
   const intervalRef = useRef(null)
-  const audioRef = useRef(null)
 
   useEffect(() => {
     if (running && seconds > 0) {
@@ -21,7 +22,6 @@ function TimerWidget() {
             clearInterval(intervalRef.current)
             setRunning(false)
             setFinished(true)
-            // Vibration wenn verfügbar
             if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300])
             return 0
           }
@@ -41,18 +41,11 @@ function TimerWidget() {
 
   const handleCustomStart = () => {
     const mins = parseInt(inputMinutes)
-    if (mins > 0) {
-      start(mins)
-      setInputMinutes('')
-    }
+    if (mins > 0) { start(mins); setInputMinutes('') }
   }
 
   const toggle = () => {
-    if (finished) {
-      setFinished(false)
-      setSeconds(0)
-      return
-    }
+    if (finished) { setFinished(false); setSeconds(0); return }
     setRunning(r => !r)
   }
 
@@ -70,21 +63,16 @@ function TimerWidget() {
 
   return (
     <div style={{
-      background: finished
-        ? 'var(--color-accent-soft)'
-        : 'var(--color-surface-2)',
-      borderRadius: '16px',
-      padding: '16px',
+      background: finished ? 'var(--color-accent-soft)' : 'var(--color-surface-2)',
+      borderRadius: '16px', padding: '16px',
       border: finished
         ? '1.5px solid var(--color-accent)'
         : '0.5px solid var(--color-border)',
       transition: 'all 0.3s'
     }}>
-
-      {/* Header */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: '6px',
-        marginBottom: '12px'
+        display: 'flex', alignItems: 'center',
+        gap: '6px', marginBottom: '12px'
       }}>
         <Timer size={14} color="var(--color-accent)" />
         <span style={{
@@ -104,58 +92,53 @@ function TimerWidget() {
         )}
       </div>
 
-      {/* Schnell-Presets */}
       {!isActive && (
-        <div style={{display: 'flex', gap: '5px', marginBottom: '10px', flexWrap: 'wrap'}}>
-          {TIMER_PRESETS.map(min => (
-            <button key={min} onClick={() => start(min)} style={{
-              padding: '5px 10px', borderRadius: '20px',
-              background: 'var(--color-surface)',
-              border: '0.5px solid var(--color-border)',
-              cursor: 'pointer', fontSize: '12px',
-              color: 'var(--color-text-muted)',
-              fontWeight: '500'
-            }}>
-              {min} min
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Eigene Zeit eingeben */}
-      {!isActive && (
-        <div style={{display: 'flex', gap: '6px', marginBottom: '12px'}}>
-          <input
-            type="number"
-            value={inputMinutes}
-            onChange={e => setInputMinutes(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleCustomStart()}
-            placeholder="Eigene Zeit (min)"
-            min="1" max="999"
-            style={{
-              flex: 1, padding: '8px 12px',
-              background: 'var(--color-surface)',
-              border: '0.5px solid var(--color-border)',
-              borderRadius: '10px', fontSize: '13px',
-              color: 'var(--color-text)', outline: 'none'
-            }}
-          />
-          <button onClick={handleCustomStart} style={{
-            padding: '8px 14px',
-            background: 'var(--color-accent)', color: '#fff',
-            border: 'none', borderRadius: '10px',
-            cursor: 'pointer', fontSize: '13px', fontWeight: '500'
+        <>
+          <div style={{
+            display: 'flex', gap: '5px',
+            marginBottom: '10px', flexWrap: 'wrap'
           }}>
-            Start
-          </button>
-        </div>
+            {TIMER_PRESETS.map(min => (
+              <button key={min} onClick={() => start(min)} style={{
+                padding: '5px 10px', borderRadius: '20px',
+                background: 'var(--color-surface)',
+                border: '0.5px solid var(--color-border)',
+                cursor: 'pointer', fontSize: '12px',
+                color: 'var(--color-text-muted)', fontWeight: '500'
+              }}>
+                {min} min
+              </button>
+            ))}
+          </div>
+          <div style={{display: 'flex', gap: '6px', marginBottom: '12px'}}>
+            <input
+              type="number" value={inputMinutes}
+              onChange={e => setInputMinutes(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCustomStart()}
+              placeholder="Eigene Zeit (min)" min="1" max="999"
+              style={{
+                flex: 1, padding: '8px 12px',
+                background: 'var(--color-surface)',
+                border: '0.5px solid var(--color-border)',
+                borderRadius: '10px', fontSize: '13px',
+                color: 'var(--color-text)', outline: 'none'
+              }}
+            />
+            <button onClick={handleCustomStart} style={{
+              padding: '8px 14px',
+              background: 'var(--color-accent)', color: '#fff',
+              border: 'none', borderRadius: '10px',
+              cursor: 'pointer', fontSize: '13px', fontWeight: '500'
+            }}>
+              Start
+            </button>
+          </div>
+        </>
       )}
 
-      {/* Timer Anzeige */}
       {isActive && (
         <div style={{
-          display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between'
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between'
         }}>
           <span style={{
             fontSize: '36px', fontWeight: '700',
@@ -173,9 +156,7 @@ function TimerWidget() {
             }}>
               {finished
                 ? <Check size={18} />
-                : running
-                  ? <Pause size={16} />
-                  : <Play size={16} />
+                : running ? <Pause size={16} /> : <Play size={16} />
               }
             </button>
             <button onClick={reset} style={{
@@ -192,7 +173,6 @@ function TimerWidget() {
         </div>
       )}
 
-      {/* Fortschrittsbalken */}
       {isActive && !finished && (
         <div style={{marginTop: '10px'}}>
           <div style={{
@@ -216,17 +196,22 @@ export default function CookingMode() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { recipes } = useRecipeStore()
+  const { household } = useAuthStore()
+  const { addEntry } = useCookHistoryStore()
   const recipe = recipes.find(r => r.id === id)
   const [currentStep, setCurrentStep] = useState(0)
   const [completedSteps, setCompletedSteps] = useState(new Set())
   const [done, setDone] = useState(false)
   const [showTimer, setShowTimer] = useState(false)
+  const [cookNotes, setCookNotes] = useState('')
+  const [saved, setSaved] = useState(false)
 
-  // Bildschirm an lassen
   useEffect(() => {
     let wakeLock = null
     if ('wakeLock' in navigator) {
-      navigator.wakeLock.request('screen').then(wl => { wakeLock = wl }).catch(() => {})
+      navigator.wakeLock.request('screen')
+        .then(wl => { wakeLock = wl })
+        .catch(() => {})
     }
     return () => { if (wakeLock) wakeLock.release() }
   }, [])
@@ -267,51 +252,100 @@ export default function CookingMode() {
   const isLast = currentStep === steps.length - 1
   const progress = ((currentStep + 1) / steps.length) * 100
 
-  const markComplete = () => {
+  const markComplete = async () => {
     setCompletedSteps(prev => new Set([...prev, currentStep]))
-    if (isLast) setDone(true)
-    else setCurrentStep(s => s + 1)
+    if (isLast) {
+      setDone(true)
+      if (household && !saved) {
+        setSaved(true)
+        await addEntry(
+          household.id,
+          recipe.id,
+          recipe.name,
+          recipe.servings || 2
+        )
+      }
+    } else {
+      setCurrentStep(s => s + 1)
+    }
   }
 
   if (done) return (
     <div style={{
-      minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      padding: '32px', background: 'var(--color-bg)', textAlign: 'center'
+      minHeight: '100dvh', display: 'flex',
+      flexDirection: 'column', background: 'var(--color-bg)'
     }}>
       <div style={{
-        width: '80px', height: '80px', borderRadius: '50%',
-        background: 'var(--color-accent-soft)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        marginBottom: '20px'
+        flex: 1, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: '32px', textAlign: 'center'
       }}>
-        <Check size={40} color="var(--color-accent)" />
+        <div style={{
+          width: '80px', height: '80px', borderRadius: '50%',
+          background: 'var(--color-accent-soft)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginBottom: '20px'
+        }}>
+          <Check size={40} color="var(--color-accent)" />
+        </div>
+        <h2 style={{
+          fontSize: '24px', fontWeight: '700',
+          color: 'var(--color-text)', marginBottom: '6px'
+        }}>
+          Guten Appetit! 🍽️
+        </h2>
+        <p style={{
+          fontSize: '15px', color: 'var(--color-text-muted)', marginBottom: '4px'
+        }}>
+          {recipe.name}
+        </p>
+        <p style={{
+          fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '24px'
+        }}>
+          {steps.length} Schritte · automatisch gespeichert
+        </p>
+
+        {/* Notizen */}
+        <div style={{width: '100%', maxWidth: '340px', marginBottom: '24px'}}>
+          <textarea
+            value={cookNotes}
+            onChange={e => setCookNotes(e.target.value)}
+            placeholder="Notiz zum Gericht (optional)..."
+            rows={3}
+            style={{
+              width: '100%', padding: '12px 14px',
+              background: 'var(--color-surface)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: '12px', fontSize: '14px',
+              color: 'var(--color-text)', outline: 'none',
+              resize: 'none', boxSizing: 'border-box', lineHeight: '1.5'
+            }}
+          />
+        </div>
+
+        <div style={{
+          display: 'flex', gap: '10px',
+          width: '100%', maxWidth: '340px'
+        }}>
+          <button onClick={() => navigate('/planner')} style={{
+            flex: 1, padding: '13px',
+            background: 'var(--color-surface)',
+            border: '0.5px solid var(--color-border)',
+            borderRadius: '12px', cursor: 'pointer',
+            fontSize: '14px', color: 'var(--color-text-muted)'
+          }}>
+            Zum Planer
+          </button>
+          <button onClick={() => navigate('/recipes')} style={{
+            flex: 1, padding: '13px',
+            background: 'var(--color-accent)', color: '#fff',
+            border: 'none', borderRadius: '12px',
+            cursor: 'pointer', fontSize: '14px', fontWeight: '500'
+          }}>
+            Zu Rezepten
+          </button>
+        </div>
       </div>
-      <h2 style={{
-        fontSize: '22px', fontWeight: '600',
-        color: 'var(--color-text)', marginBottom: '8px'
-      }}>
-        Guten Appetit! 🍽️
-      </h2>
-      <p style={{
-        fontSize: '14px', color: 'var(--color-text-muted)',
-        marginBottom: '8px'
-      }}>
-        {recipe.name} ist fertig
-      </p>
-      <p style={{
-        fontSize: '13px', color: 'var(--color-text-muted)',
-        marginBottom: '32px'
-      }}>
-        {steps.length} Schritte abgeschlossen
-      </p>
-      <button onClick={() => navigate('/recipes')} style={{
-        padding: '13px 28px', background: 'var(--color-accent)',
-        color: '#fff', border: 'none', borderRadius: '12px',
-        cursor: 'pointer', fontSize: '15px', fontWeight: '500'
-      }}>
-        Zurück zu Rezepten
-      </button>
     </div>
   )
 
@@ -337,8 +371,7 @@ export default function CookingMode() {
         </button>
         <div style={{flex: 1, minWidth: 0}}>
           <div style={{
-            fontSize: '13px', fontWeight: '600',
-            color: 'var(--color-text)',
+            fontSize: '13px', fontWeight: '600', color: 'var(--color-text)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
           }}>
             {recipe.name}
@@ -357,8 +390,7 @@ export default function CookingMode() {
           cursor: 'pointer', fontSize: '12px',
           color: showTimer ? 'var(--color-accent)' : 'var(--color-text-muted)'
         }}>
-          <Timer size={14} />
-          Timer
+          <Timer size={14} /> Timer
         </button>
       </div>
 
@@ -371,9 +403,11 @@ export default function CookingMode() {
       </div>
 
       {/* Content */}
-      <div style={{flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px'}}>
+      <div style={{
+        flex: 1, padding: '16px',
+        display: 'flex', flexDirection: 'column', gap: '12px'
+      }}>
 
-        {/* Timer Widget */}
         {showTimer && <TimerWidget />}
 
         {/* Zutaten (nur Schritt 1) */}
@@ -400,14 +434,16 @@ export default function CookingMode() {
                   borderRadius: '20px', color: 'var(--color-text-muted)',
                   border: '0.5px solid var(--color-border)'
                 }}>
-                  {ing.amount && `${ing.amount} `}{ing.unit && `${ing.unit} `}{ing.name}
+                  {ing.amount && `${ing.amount} `}
+                  {ing.unit && `${ing.unit} `}
+                  {ing.name}
                 </span>
               ))}
             </div>
           </div>
         )}
 
-        {/* Schritt-Übersicht (kompakt) */}
+        {/* Schritt-Übersicht */}
         <div style={{
           background: 'var(--color-surface)',
           borderRadius: '14px',
@@ -433,9 +469,6 @@ export default function CookingMode() {
                   : i === currentStep
                     ? 'var(--color-accent)'
                     : 'var(--color-surface-2)',
-                border: i === currentStep && !completedSteps.has(i)
-                  ? '2px solid var(--color-accent)'
-                  : 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0
               }}>
@@ -444,7 +477,9 @@ export default function CookingMode() {
                   : <span style={{
                       fontSize: '11px', fontWeight: '600',
                       color: i === currentStep ? '#fff' : 'var(--color-text-muted)'
-                    }}>{i + 1}</span>
+                    }}>
+                      {i + 1}
+                    </span>
                 }
               </div>
               <span style={{
@@ -454,8 +489,7 @@ export default function CookingMode() {
                   : 'var(--color-text)',
                 textDecoration: completedSteps.has(i) ? 'line-through' : 'none',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                flex: 1,
-                fontWeight: i === currentStep ? '500' : '400'
+                flex: 1, fontWeight: i === currentStep ? '500' : '400'
               }}>
                 {s.description}
               </span>
@@ -471,8 +505,7 @@ export default function CookingMode() {
           padding: '20px'
         }}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: '10px',
-            marginBottom: '14px'
+            display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px'
           }}>
             <div style={{
               width: '32px', height: '32px', borderRadius: '50%',
@@ -501,8 +534,7 @@ export default function CookingMode() {
 
       {/* Navigation */}
       <div style={{
-        padding: '16px 16px 32px',
-        display: 'flex', gap: '10px',
+        padding: '16px 16px 32px', display: 'flex', gap: '10px',
         background: 'var(--color-surface)',
         borderTop: '0.5px solid var(--color-border)'
       }}>
@@ -525,11 +557,10 @@ export default function CookingMode() {
           fontSize: '15px', fontWeight: '600',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
         }}>
-          {isLast ? (
-            <><Check size={18} /> Fertig!</>
-          ) : (
-            <>Schritt erledigt <ArrowRight size={16} /></>
-          )}
+          {isLast
+            ? <><Check size={18} /> Fertig!</>
+            : <>Schritt erledigt <ArrowRight size={16} /></>
+          }
         </button>
       </div>
     </div>

@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuthStore } from '../../store/useAuthStore'
 import { CalendarDays, BookOpen, ShoppingCart, Sun, Moon, LogOut } from 'lucide-react'
+import { CalendarDays, BookOpen, ShoppingCart, Clock, Sun, Moon, LogOut } from 'lucide-react'
+
 
 const navItems = [
   { to: '/planner', label: 'Planer', icon: CalendarDays },
   { to: '/recipes', label: 'Rezepte', icon: BookOpen },
   { to: '/shopping', label: 'Einkauf', icon: ShoppingCart },
+  { to: '/history', label: 'Historie', icon: Clock },
 ]
 
 export default function Layout({ children }) {

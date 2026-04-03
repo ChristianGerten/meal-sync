@@ -9,10 +9,12 @@ import WeekPlanner from './pages/WeekPlanner'
 import ShoppingList from './pages/ShoppingList'
 import CookingMode from './pages/CookingMode'
 import Layout from './components/layout/Layout'
+import History from './pages/History'
 
 function AppRoutes() {
   const { user, household } = useAuthStore()
   useRealtime(household?.id)
+
 
   if (!user) return <Navigate to="/login" replace />
 
@@ -37,6 +39,7 @@ function AppRoutes() {
         <Route path="/recipes/:id" element={<RecipeDetail />} />
         <Route path="/shopping" element={<ShoppingList />} />
         <Route path="/cook/:id" element={<CookingMode />} />
+        <Route path="/history" element={<History />} />
       </Routes>
     </Layout>
   )
