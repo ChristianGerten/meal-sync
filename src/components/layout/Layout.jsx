@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuthStore } from '../../store/useAuthStore'
-import { CalendarDays, BookOpen, ShoppingCart, Sun, Moon, LogOut } from 'lucide-react'
 import { CalendarDays, BookOpen, ShoppingCart, Clock, Sun, Moon, LogOut } from 'lucide-react'
 
 
