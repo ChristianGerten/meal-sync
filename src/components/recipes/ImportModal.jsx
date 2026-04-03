@@ -3,12 +3,12 @@ import { useRecipeStore } from '../../store/useRecipeStore'
 import { useAuthStore } from '../../store/useAuthStore'
 import { supabase } from '../../lib/supabase'
 import { toast } from '../Toast'
-import { X, Camera, Link, FileJson, Check, ChefHat } from 'lucide-react'
+import { X, Link, FileJson, Check, ChefHat } from 'lucide-react'
 
 const TABS = [
-  { id: 'foto', label: 'Foto', icon: Camera },
-  { id: 'url', label: 'URL', icon: Link },
-  { id: 'json', label: 'JSON', icon: FileJson },
+  { id: 'foto', label: 'Foto', icon: '📷' },
+  { id: 'url', label: 'URL', icon: '🔗' },
+  { id: 'json', label: 'JSON', icon: '{}' },
 ]
 
 export default function ImportModal({ onClose }) {
@@ -78,7 +78,9 @@ export default function ImportModal({ onClose }) {
       if (data?.error) throw new Error(data.error)
       setPreview(data)
     } catch (err) {
-      setError('Fehler: ' + err.message)
+      setError('')
+      // URL fehlgeschlagen — Fallback-Hinweis zeigen
+      setError('url_failed')
     } finally {
       setLoading(false)
     }
@@ -144,7 +146,7 @@ export default function ImportModal({ onClose }) {
           display: 'flex', padding: '12px 16px', gap: '8px',
           borderBottom: '0.5px solid var(--color-border)', flexShrink: 0
         }}>
-          {TABS.map(({ id, label, icon: Icon }) => (
+          {TABS.map(({ id, label, icon }) => (
             <button key={id} onClick={() => { setTab(id); reset() }} style={{
               flex: 1, padding: '9px 4px', borderRadius: '10px',
               border: 'none', cursor: 'pointer', fontSize: '13px',
@@ -154,7 +156,7 @@ export default function ImportModal({ onClose }) {
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
               transition: 'all 0.15s'
             }}>
-              <Icon size={14} /> {label}
+              <span style={{fontSize: '14px'}}>{icon}</span> {label}
             </button>
           ))}
         </div>
@@ -165,51 +167,134 @@ export default function ImportModal({ onClose }) {
           {/* Foto Tab */}
           {tab === 'foto' && !preview && (
             <div>
-              <label style={{
-                display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center',
-                height: '180px', borderRadius: '16px',
-                border: '1.5px dashed var(--color-border)',
-                background: 'var(--color-surface-2)',
-                cursor: 'pointer', gap: '10px'
-              }}>
-                {imagePreview ? (
-                  <img src={imagePreview} alt="" style={{
-                    width: '100%', height: '100%',
-                    objectFit: 'cover', borderRadius: '16px'
-                  }} />
-                ) : (
-                  <>
-                    <Camera size={32} color="var(--color-text-muted)" />
-                    <span style={{fontSize: '14px', color: 'var(--color-text-muted)'}}>
-                      {loading ? 'KI analysiert...' : 'Foto auswählen'}
-                    </span>
+              {!imagePreview ? (
+                <>
+                  <p style={{
+                    fontSize: '13px', color: 'var(--color-text-muted)',
+                    marginBottom: '14px', lineHeight: '1.5'
+                  }}>
+                    Fotografiere ein Rezept aus einem Kochbuch oder mache einen Screenshot —
+                    die KI erkennt automatisch Zutaten und Zubereitungsschritte.
+                  </p>
+
+                  {/* Zwei Buttons */}
+                  <div style={{display: 'flex', gap: '10px', marginBottom: '12px'}}>
+
+                    {/* Kamera direkt */}
+                    <label style={{
+                      flex: 1, display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center',
+                      padding: '24px 12px', borderRadius: '16px',
+                      border: '1.5px solid var(--color-accent)',
+                      background: 'var(--color-accent-soft)',
+                      cursor: 'pointer', gap: '10px',
+                      transition: 'all 0.15s'
+                    }}>
+                      <span style={{fontSize: '36px'}}>📷</span>
+                      <div style={{textAlign: 'center'}}>
+                        <div style={{
+                          fontSize: '14px', fontWeight: '600',
+                          color: 'var(--color-accent-text)', marginBottom: '3px'
+                        }}>
+                          Foto aufnehmen
+                        </div>
+                        <div style={{fontSize: '11px', color: 'var(--color-accent-text)', opacity: 0.7}}>
+                          Kamera öffnen
+                        </div>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleFotoImport}
+                        style={{display: 'none'}}
+                        disabled={loading}
+                      />
+                    </label>
+
+                    {/* Aus Galerie */}
+                    <label style={{
+                      flex: 1, display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center',
+                      padding: '24px 12px', borderRadius: '16px',
+                      border: '0.5px solid var(--color-border)',
+                      background: 'var(--color-surface-2)',
+                      cursor: 'pointer', gap: '10px',
+                      transition: 'all 0.15s'
+                    }}>
+                      <span style={{fontSize: '36px'}}>🖼️</span>
+                      <div style={{textAlign: 'center'}}>
+                        <div style={{
+                          fontSize: '14px', fontWeight: '600',
+                          color: 'var(--color-text)', marginBottom: '3px'
+                        }}>
+                          Aus Galerie
+                        </div>
+                        <div style={{fontSize: '11px', color: 'var(--color-text-muted)'}}>
+                          Foto auswählen
+                        </div>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFotoImport}
+                        style={{display: 'none'}}
+                        disabled={loading}
+                      />
+                    </label>
+
+                  </div>
+
+                  <div style={{
+                    padding: '10px 14px',
+                    background: 'var(--color-surface-2)',
+                    borderRadius: '10px', fontSize: '12px',
+                    color: 'var(--color-text-muted)', lineHeight: '1.5'
+                  }}>
+                    💡 Tipp: Funktioniert auch mit Screenshots von Rezeptseiten —
+                    einfach Screenshot machen und aus der Galerie importieren.
+                  </div>
+                </>
+              ) : (
+                /* Bild-Vorschau während KI analysiert */
+                <div>
+                  <div style={{
+                    borderRadius: '16px', overflow: 'hidden',
+                    marginBottom: '12px', position: 'relative'
+                  }}>
+                    <img src={imagePreview} alt="" style={{
+                      width: '100%', height: '200px', objectFit: 'cover',
+                      display: 'block'
+                    }} />
                     {loading && (
-                      <span style={{fontSize: '12px', color: 'var(--color-accent)'}}>
-                        Das kann 10-20 Sekunden dauern
-                      </span>
+                      <div style={{
+                        position: 'absolute', inset: 0,
+                        background: 'rgba(0,0,0,0.5)',
+                        display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', justifyContent: 'center', gap: '10px'
+                      }}>
+                        <div style={{fontSize: '32px'}}>🤖</div>
+                        <div style={{
+                          fontSize: '14px', fontWeight: '600', color: '#fff'
+                        }}>
+                          KI analysiert...
+                        </div>
+                        <div style={{fontSize: '12px', color: 'rgba(255,255,255,0.7)'}}>
+                          Erkennt Zutaten und Schritte
+                        </div>
+                      </div>
                     )}
-                  </>
-                )}
-                <input
-                  type="file" accept="image/*"
-                  onChange={handleFotoImport}
-                  style={{display: 'none'}}
-                  disabled={loading}
-                />
-              </label>
-              {loading && imagePreview && (
-                <div style={{
-                  marginTop: '12px', padding: '12px',
-                  background: 'var(--color-accent-soft)',
-                  borderRadius: '12px', textAlign: 'center'
-                }}>
-                  <div style={{fontSize: '13px', color: 'var(--color-accent-text)', fontWeight: '500'}}>
-                    KI analysiert das Bild...
                   </div>
-                  <div style={{fontSize: '12px', color: 'var(--color-accent-text)', marginTop: '4px', opacity: 0.8}}>
-                    Erkennt Zutaten und Zubereitungsschritte
-                  </div>
+                  {loading && (
+                    <div style={{
+                      padding: '12px 14px',
+                      background: 'var(--color-accent-soft)',
+                      borderRadius: '12px', fontSize: '13px',
+                      color: 'var(--color-accent-text)', textAlign: 'center'
+                    }}>
+                      Das kann 10-20 Sekunden dauern...
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -235,14 +320,54 @@ export default function ImportModal({ onClose }) {
                   boxSizing: 'border-box'
                 }}
               />
-              <button onClick={handleUrlImport} disabled={loading || !urlInput.trim()} style={{
-                padding: '13px', background: 'var(--color-accent)', color: '#fff',
-                border: 'none', borderRadius: '12px', cursor: 'pointer',
-                fontSize: '14px', fontWeight: '500',
-                opacity: loading || !urlInput.trim() ? 0.6 : 1
-              }}>
+              <button
+                onClick={handleUrlImport}
+                disabled={loading || !urlInput.trim()}
+                style={{
+                  padding: '13px', background: 'var(--color-accent)', color: '#fff',
+                  border: 'none', borderRadius: '12px', cursor: 'pointer',
+                  fontSize: '14px', fontWeight: '500',
+                  opacity: loading || !urlInput.trim() ? 0.6 : 1
+                }}
+              >
                 {loading ? 'Lädt...' : 'Rezept laden'}
               </button>
+
+              {/* URL fehlgeschlagen — Foto-Fallback Hinweis */}
+              {error === 'url_failed' && (
+                <div style={{
+                  padding: '14px',
+                  background: '#fef3c7',
+                  border: '0.5px solid #fde68a',
+                  borderRadius: '12px'
+                }}>
+                  <div style={{
+                    fontSize: '13px', fontWeight: '600',
+                    color: '#92400e', marginBottom: '6px'
+                  }}>
+                    URL konnte nicht geladen werden
+                  </div>
+                  <div style={{
+                    fontSize: '12px', color: '#92400e',
+                    lineHeight: '1.5', marginBottom: '10px'
+                  }}>
+                    Manche Seiten blockieren automatische Abfragen.
+                    Mach einen Screenshot der Rezeptseite und importiere ihn als Foto —
+                    die KI erkennt das Rezept trotzdem.
+                  </div>
+                  <button
+                    onClick={() => { setTab('foto'); reset() }}
+                    style={{
+                      width: '100%', padding: '10px',
+                      background: '#92400e', color: '#fff',
+                      border: 'none', borderRadius: '8px',
+                      cursor: 'pointer', fontSize: '13px', fontWeight: '500'
+                    }}
+                  >
+                    📷 Als Foto importieren
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -267,19 +392,23 @@ export default function ImportModal({ onClose }) {
                   fontFamily: 'monospace', lineHeight: '1.5'
                 }}
               />
-              <button onClick={handleJsonImport} disabled={!jsonInput.trim()} style={{
-                padding: '13px', background: 'var(--color-accent)', color: '#fff',
-                border: 'none', borderRadius: '12px', cursor: 'pointer',
-                fontSize: '14px', fontWeight: '500',
-                opacity: !jsonInput.trim() ? 0.6 : 1
-              }}>
+              <button
+                onClick={handleJsonImport}
+                disabled={!jsonInput.trim()}
+                style={{
+                  padding: '13px', background: 'var(--color-accent)', color: '#fff',
+                  border: 'none', borderRadius: '12px', cursor: 'pointer',
+                  fontSize: '14px', fontWeight: '500',
+                  opacity: !jsonInput.trim() ? 0.6 : 1
+                }}
+              >
                 Vorschau anzeigen
               </button>
             </div>
           )}
 
-          {/* Fehler */}
-          {error && (
+          {/* Allgemeiner Fehler */}
+          {error && error !== 'url_failed' && (
             <div style={{
               marginTop: '12px', padding: '12px 14px',
               background: '#fef2f2', border: '0.5px solid #fecaca',
@@ -293,7 +422,6 @@ export default function ImportModal({ onClose }) {
           {preview && (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
 
-              {/* Erfolgs-Header */}
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '10px',
                 padding: '12px 14px',
@@ -305,7 +433,10 @@ export default function ImportModal({ onClose }) {
                   <div style={{fontSize: '13px', fontWeight: '600', color: '#166534'}}>
                     Rezept erkannt
                   </div>
-                  <div style={{fontSize: '11px', color: '#166534', opacity: 0.8, marginTop: '1px'}}>
+                  <div style={{
+                    fontSize: '11px', color: '#166534',
+                    opacity: 0.8, marginTop: '1px'
+                  }}>
                     Prüfe die Daten und speichere das Rezept
                   </div>
                 </div>
@@ -320,7 +451,8 @@ export default function ImportModal({ onClose }) {
                 <div style={{
                   fontSize: '11px', fontWeight: '600',
                   color: 'var(--color-text-muted)',
-                  textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px'
+                  textTransform: 'uppercase', letterSpacing: '0.5px',
+                  marginBottom: '4px'
                 }}>
                   Name
                 </div>
@@ -347,7 +479,8 @@ export default function ImportModal({ onClose }) {
                   <div style={{
                     fontSize: '11px', fontWeight: '600',
                     color: 'var(--color-text-muted)',
-                    textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px'
+                    textTransform: 'uppercase', letterSpacing: '0.5px',
+                    marginBottom: '8px'
                   }}>
                     Zutaten ({preview.ingredients.length})
                   </div>
@@ -371,7 +504,7 @@ export default function ImportModal({ onClose }) {
                 </div>
               )}
 
-              {/* Zubereitungsschritte */}
+              {/* Schritte */}
               {preview.steps && preview.steps.length > 0 && (
                 <div style={{
                   background: 'var(--color-surface-2)',
@@ -381,7 +514,8 @@ export default function ImportModal({ onClose }) {
                   <div style={{
                     fontSize: '11px', fontWeight: '600',
                     color: 'var(--color-text-muted)',
-                    textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px',
+                    textTransform: 'uppercase', letterSpacing: '0.5px',
+                    marginBottom: '8px',
                     display: 'flex', alignItems: 'center', gap: '5px'
                   }}>
                     <ChefHat size={12} />
@@ -396,7 +530,8 @@ export default function ImportModal({ onClose }) {
                           width: '20px', height: '20px', borderRadius: '50%',
                           background: 'var(--color-accent)', color: '#fff',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '11px', fontWeight: '700', flexShrink: 0, marginTop: '1px'
+                          fontSize: '11px', fontWeight: '700',
+                          flexShrink: 0, marginTop: '1px'
                         }}>
                           {i + 1}
                         </div>
@@ -444,8 +579,10 @@ export default function ImportModal({ onClose }) {
                   {loading ? 'Speichert...' : 'Rezept speichern'}
                 </button>
               </div>
+
             </div>
           )}
+
         </div>
       </div>
     </div>
