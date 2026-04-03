@@ -35,21 +35,19 @@ const parseIngredientLine = (line) => {
     return {
       amount: match[1] ? parseFloat(match[1].replace(',', '.')) : null,
       unit: isUnit ? unitCandidate : '',
-      name: isUnit ? match[3].trim() : `${unitCandidate} ${match[3]}`.trim(),
+      name: isUnit ? match[3].trim() : (unitCandidate + ' ' + match[3]).trim(),
       category: 'Sonstiges'
     }
   }
   return { name: clean, amount: null, unit: '', category: 'Sonstiges' }
 }
 
-// ── Ansicht-Modus ─────────────────────────────────────────────
 function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
   const steps = [...(recipe.recipe_steps || [])].sort((a, b) => a.step_number - b.step_number)
+  const sourceUrl = recipe.source_url || ''
 
   return (
     <div style={{paddingBottom: '80px'}}>
-
-      {/* Header */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 10,
         background: 'var(--color-surface)',
@@ -89,7 +87,6 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
 
       <div style={{padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px'}}>
 
-        {/* Kochen Button */}
         {steps.length > 0 && (
           <button onClick={onCook} style={{
             width: '100%', padding: '14px',
@@ -102,7 +99,6 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
           </button>
         )}
 
-        {/* Bild */}
         {recipe.image_url && (
           <img
             src={recipe.image_url}
@@ -116,7 +112,6 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
           />
         )}
 
-        {/* Basis-Info */}
         <div style={{
           background: 'var(--color-surface)',
           borderRadius: '16px', padding: '16px',
@@ -155,7 +150,7 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
             )}
           </div>
 
-          {recipe.tags?.length > 0 && (
+          {recipe.tags && recipe.tags.length > 0 && (
             <div style={{display: 'flex', flexWrap: 'wrap', gap: '5px'}}>
               {recipe.tags.map(tag => (
                 <span key={tag} style={{
@@ -181,8 +176,7 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
           )}
         </div>
 
-        {/* Zutaten */}
-        {recipe.ingredients?.length > 0 && (
+        {recipe.ingredients && recipe.ingredients.length > 0 && (
           <div style={{
             background: 'var(--color-surface)',
             borderRadius: '16px', padding: '16px',
@@ -213,10 +207,13 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
                       fontSize: '14px', fontWeight: '700',
                       color: 'var(--color-text)', marginLeft: '8px'
                     }}>
-                      {ing.amount && `${Number(ing.amount) % 1 === 0
-                        ? Number(ing.amount)
-                        : Number(ing.amount).toFixed(1)}`}
-                      {ing.unit && ` ${ing.unit}`}
+                      {ing.amount
+                        ? Number(ing.amount) % 1 === 0
+                          ? Number(ing.amount)
+                          : Number(ing.amount).toFixed(1)
+                        : ''
+                      }
+                      {ing.unit ? ' ' + ing.unit : ''}
                     </span>
                   )}
                 </div>
@@ -225,7 +222,6 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
           </div>
         )}
 
-        {/* Zubereitungsschritte */}
         {steps.length > 0 && (
           <div style={{
             background: 'var(--color-surface)',
@@ -264,44 +260,48 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
           </div>
         )}
 
-{recipe['source_url'] && (
-  
-    href={recipe['source_url']}
-    target="_blank"
-    rel="noopener noreferrer"
-    style={{
-      display: 'block', padding: '10px 14px',
-      background: 'var(--color-surface)',
-      border: '0.5px solid var(--color-border)',
-      borderRadius: '12px', fontSize: '13px',
-      color: 'var(--color-accent)', textDecoration: 'none'
-    }}
-  >
-    🔗 Originalrezept öffnen
-  </a>
-)}
+        {sourceUrl.length > 0 && (
+          
+            href={sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'block', padding: '10px 14px',
+              background: 'var(--color-surface)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: '12px', fontSize: '13px',
+              color: 'var(--color-accent)', textDecoration: 'none'
+            }}
+          >
+            🔗 Originalrezept öffnen
+          </a>
+        )}
+
       </div>
     </div>
   )
 }
 
-// ── Bearbeiten-Modus ──────────────────────────────────────────
 function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadImage }) {
   const [form, setForm] = useState({
-    name: recipe?.name || '',
-    category: recipe?.category || '',
-    description: recipe?.description || '',
-    servings: recipe?.servings || 2,
-    tags: recipe?.tags || [],
-    image_url: recipe?.image_url || '',
-    source_url: recipe?.source_url || ''
+    name: recipe ? recipe.name || '' : '',
+    category: recipe ? recipe.category || '' : '',
+    description: recipe ? recipe.description || '' : '',
+    servings: recipe ? recipe.servings || 2 : 2,
+    tags: recipe ? recipe.tags || [] : [],
+    image_url: recipe ? recipe.image_url || '' : '',
+    source_url: recipe ? recipe.source_url || '' : ''
   })
   const [ingredients, setIngredients] = useState(
-    recipe?.ingredients?.length ? recipe.ingredients : [emptyIngredient()]
+    recipe && recipe.ingredients && recipe.ingredients.length
+      ? recipe.ingredients
+      : [emptyIngredient()]
   )
   const [steps, setSteps] = useState(() => {
-    const sorted = [...(recipe?.recipe_steps || [])].sort((a, b) => a.step_number - b.step_number)
-    return sorted.length ? sorted.map(s => s.description) : ['']
+    if (!recipe || !recipe.recipe_steps || !recipe.recipe_steps.length) return ['']
+    return [...recipe.recipe_steps]
+      .sort((a, b) => a.step_number - b.step_number)
+      .map(s => s.description)
   })
   const [quickInput, setQuickInput] = useState('')
   const [quickMode, setQuickMode] = useState(false)
@@ -316,10 +316,17 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
     setSaving(true)
     try {
       await onSave({
-        ...form,
+        name: form.name,
+        category: form.category,
+        description: form.description,
+        servings: form.servings,
+        tags: form.tags,
+        image_url: form.image_url,
+        source_url: form.source_url,
         ingredients: ingredients.filter(i => i.name.trim()),
         steps: steps.filter(s => s.trim()).map((s, i) => ({
-          step_number: i + 1, description: s
+          step_number: i + 1,
+          description: s
         }))
       })
     } finally {
@@ -334,7 +341,9 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
     try {
       const url = await uploadImage(file, user.id)
       setForm(f => ({ ...f, image_url: url }))
-    } finally { setUploading(false) }
+    } finally {
+      setUploading(false)
+    }
   }
 
   const handleQuickInput = () => {
@@ -350,7 +359,9 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
   const toggleTag = (tag) => {
     setForm(f => ({
       ...f,
-      tags: f.tags.includes(tag) ? f.tags.filter(t => t !== tag) : [...f.tags, tag]
+      tags: f.tags.includes(tag)
+        ? f.tags.filter(t => t !== tag)
+        : [...f.tags, tag]
     }))
   }
 
@@ -370,8 +381,6 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
 
   return (
     <div style={{paddingBottom: '80px'}}>
-
-      {/* Header */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 10,
         background: 'var(--color-surface)',
@@ -386,8 +395,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
           <ArrowLeft size={20} />
         </button>
         <span style={{
-          fontWeight: '600', fontSize: '16px',
-          color: 'var(--color-text)', flex: 1
+          fontWeight: '600', fontSize: '16px', color: 'var(--color-text)', flex: 1
         }}>
           {isNew ? 'Neues Rezept' : 'Bearbeiten'}
         </span>
@@ -404,7 +412,6 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
 
       <div style={{padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px'}}>
 
-        {/* Bild */}
         <label style={{cursor: 'pointer', display: 'block'}}>
           <div style={{
             height: '160px', borderRadius: '16px',
@@ -440,7 +447,6 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
           <input type="file" accept="image/*" onChange={handleImageUpload} style={{display: 'none'}} />
         </label>
 
-        {/* Name */}
         <input
           value={form.name}
           onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
@@ -452,7 +458,6 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
           }}
         />
 
-        {/* Portionen */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '12px',
           background: 'var(--color-surface)',
@@ -471,7 +476,9 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
               cursor: 'pointer', fontSize: '18px', color: 'var(--color-text)',
               display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}
-          >−</button>
+          >
+            -
+          </button>
           <span style={{
             fontSize: '16px', fontWeight: '600', color: 'var(--color-text)',
             minWidth: '24px', textAlign: 'center'
@@ -487,15 +494,15 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
               cursor: 'pointer', fontSize: '18px', color: 'var(--color-text)',
               display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}
-          >+</button>
+          >
+            +
+          </button>
         </div>
 
-        {/* Kategorie */}
         <div>
           <div style={{
-            fontSize: '12px', fontWeight: '600',
-            color: 'var(--color-text-muted)', marginBottom: '8px',
-            textTransform: 'uppercase', letterSpacing: '0.5px'
+            fontSize: '12px', fontWeight: '600', color: 'var(--color-text-muted)',
+            marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px'
           }}>
             Kategorie
           </div>
@@ -504,8 +511,8 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
               <button key={cat} onClick={() => setForm(f => ({
                 ...f, category: f.category === cat ? '' : cat
               }))} style={{
-                padding: '7px 14px', borderRadius: '20px',
-                cursor: 'pointer', fontSize: '12px',
+                padding: '7px 14px', borderRadius: '20px', cursor: 'pointer',
+                fontSize: '12px',
                 background: form.category === cat ? 'var(--color-accent)' : 'var(--color-surface)',
                 color: form.category === cat ? '#fff' : 'var(--color-text-muted)',
                 border: form.category === cat
@@ -519,26 +526,20 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
           </div>
         </div>
 
-        {/* Tags */}
         <div>
           <div style={{
-            fontSize: '12px', fontWeight: '600',
-            color: 'var(--color-text-muted)', marginBottom: '8px',
-            textTransform: 'uppercase', letterSpacing: '0.5px'
+            fontSize: '12px', fontWeight: '600', color: 'var(--color-text-muted)',
+            marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px'
           }}>
             Tags
           </div>
           <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
             {TAGS.map(tag => (
               <button key={tag} onClick={() => toggleTag(tag)} style={{
-                padding: '7px 14px', borderRadius: '20px',
-                cursor: 'pointer', fontSize: '12px',
-                background: form.tags.includes(tag)
-                  ? 'var(--color-accent-soft)'
-                  : 'var(--color-surface)',
-                color: form.tags.includes(tag)
-                  ? 'var(--color-accent-text)'
-                  : 'var(--color-text-muted)',
+                padding: '7px 14px', borderRadius: '20px', cursor: 'pointer',
+                fontSize: '12px',
+                background: form.tags.includes(tag) ? 'var(--color-accent-soft)' : 'var(--color-surface)',
+                color: form.tags.includes(tag) ? 'var(--color-accent-text)' : 'var(--color-text-muted)',
                 border: form.tags.includes(tag)
                   ? '1.5px solid var(--color-accent)'
                   : '0.5px solid var(--color-border)',
@@ -552,7 +553,6 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
 
         <div style={{height: '0.5px', background: 'var(--color-border)'}} />
 
-        {/* Zutaten */}
         <div>
           <div style={{
             display: 'flex', alignItems: 'center',
@@ -568,22 +568,21 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
               border: '0.5px solid var(--color-border)',
               borderRadius: '20px', cursor: 'pointer'
             }}>
-              ⚡ Schnelleingabe
+              Schnelleingabe
             </button>
           </div>
 
           {quickMode && (
             <div style={{
-              background: 'var(--color-accent-soft)',
-              borderRadius: '12px', padding: '12px',
-              marginBottom: '12px',
+              background: 'var(--color-accent-soft)', borderRadius: '12px',
+              padding: '12px', marginBottom: '12px',
               border: '0.5px solid var(--color-border)'
             }}>
               <p style={{
                 fontSize: '11px', color: 'var(--color-accent-text)',
                 marginBottom: '8px', lineHeight: '1.5'
               }}>
-                Eine Zutat pro Zeile — z.B. "200g Spaghetti", "3 Eier", "Salz"
+                Eine Zutat pro Zeile
               </p>
               <textarea
                 value={quickInput}
@@ -636,7 +635,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
                   onChange={e => updateIng(i, 'unit', e.target.value)}
                   style={{...inputStyle, width: '68px', padding: '9px 4px'}}
                 >
-                  <option value="">—</option>
+                  <option value="">-</option>
                   {UNITS.map(u => <option key={u}>{u}</option>)}
                 </select>
                 <input
@@ -680,7 +679,6 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
 
         <div style={{height: '0.5px', background: 'var(--color-border)'}} />
 
-        {/* Zubereitungsschritte */}
         <div>
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'
@@ -711,7 +709,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
                     copy[i] = e.target.value
                     setSteps(copy)
                   }}
-                  placeholder={`Schritt ${i + 1}…`}
+                  placeholder={'Schritt ' + (i + 1) + '...'}
                   rows={2}
                   style={{
                     flex: 1, padding: '10px 12px',
@@ -751,12 +749,10 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
 
         <div style={{height: '0.5px', background: 'var(--color-border)'}} />
 
-        {/* Notizen */}
         <div>
           <div style={{
-            fontSize: '12px', fontWeight: '600',
-            color: 'var(--color-text-muted)', marginBottom: '8px',
-            textTransform: 'uppercase', letterSpacing: '0.5px'
+            fontSize: '12px', fontWeight: '600', color: 'var(--color-text-muted)',
+            marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px'
           }}>
             Notizen & Tipps
           </div>
@@ -775,12 +771,12 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
             }}
           />
         </div>
+
       </div>
     </div>
   )
 }
 
-// ── Haupt-Komponente ──────────────────────────────────────────
 export default function RecipeDetail() {
   const { id } = useParams()
   const isNew = id === 'new'
@@ -794,7 +790,7 @@ export default function RecipeDetail() {
   const [detailsLoading, setDetailsLoading] = useState(false)
 
   useEffect(() => {
-    if (!isNew && id && !existing?.ingredients) {
+    if (!isNew && id && existing && !existing.ingredients) {
       setDetailsLoading(true)
       fetchRecipeDetails(id).finally(() => setDetailsLoading(false))
     }
@@ -831,7 +827,9 @@ export default function RecipeDetail() {
       height: '60vh', flexDirection: 'column', gap: '12px'
     }}>
       <div style={{fontSize: '32px'}}>🍳</div>
-      <p style={{color: 'var(--color-text-muted)', fontSize: '14px'}}>Lade Rezept...</p>
+      <p style={{color: 'var(--color-text-muted)', fontSize: '14px'}}>
+        Lade Rezept...
+      </p>
     </div>
   )
 
@@ -854,7 +852,7 @@ export default function RecipeDetail() {
       recipe={existing}
       onEdit={() => setEditMode(true)}
       onDelete={handleDelete}
-      onCook={() => navigate(`/cook/${id}`)}
+      onCook={() => navigate('/cook/' + id)}
       navigate={navigate}
     />
   )
