@@ -14,7 +14,8 @@ const emptyRecipe = {
   prep_time: null,
   cook_time: null,
   tags: [],
-  ingredients: []
+  ingredients: [],
+  steps: []
 }
 
 const sanitizeJson = (str: string) => {
@@ -43,7 +44,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1500,
+        max_tokens: 2000,
         messages: [
           {
             role: 'user',
@@ -54,7 +55,27 @@ serve(async (req) => {
               },
               {
                 type: 'text',
-                text: 'Extract the recipe from this image. Return ONLY a single-line JSON object with no newlines inside string values. Use this exact format: {"name":"","description":"","category":"","servings":2,"prep_time":null,"cook_time":null,"tags":[],"ingredients":[{"name":"","amount":null,"unit":"","category":"Sonstiges"}],"steps":["Schritt 1 Beschreibung","Schritt 2 Beschreibung"]} Ingredient categories: Gemüse, Obst, Fleisch, Fisch, Kühlregal, Milchprodukte, Nudeln, Reis & Getreide, Konserven, Gewürze, Backen, Sonstiges. Extract ALL preparation steps from the image into the steps array as plain strings. If no recipe is found return the empty template. ONLY JSON, nothing else.'
+                text: `You are a recipe extraction expert. Analyze this recipe image carefully.
+
+Extract ALL information and return ONLY a valid single-line JSON object.
+
+CRITICAL RULES:
+1. Return ONLY JSON - no text before or after
+2. No newlines inside string values - replace with space
+3. For "steps": Extract ALL preparation/cooking instructions as individual steps.
+   - If steps are numbered (1. 2. 3.) → split by numbers
+   - If steps are separated by paragraphs → split by paragraph  
+   - If it is one long text → split into logical cooking actions
+   - Each step should be ONE clear action (e.g. "Zwiebeln würfeln und in Butter anschwitzen")
+   - Minimum 3 steps, maximum 15 steps
+4. For "ingredients": extract name, amount, unit for each ingredient
+
+JSON format:
+{"name":"","description":"","category":"","servings":2,"prep_time":null,"cook_time":null,"tags":[],"ingredients":[{"name":"","amount":null,"unit":"","category":"Sonstiges"}],"steps":["step 1","step 2","step 3"]}
+
+Ingredient categories: Gemüse, Obst, Fleisch, Fisch, Kühlregal, Milchprodukte, Nudeln, Reis & Getreide, Konserven, Gewürze, Backen, Sonstiges.
+
+ONLY return the JSON object. Nothing else.`
               }
             ]
           },
@@ -72,16 +93,12 @@ serve(async (req) => {
     }
 
     const data = await response.json()
-
-    // Claude hat mit { angefangen (prefill) — wir fügen es wieder hinzu
     const rawText = '{' + data.content[0].text.trim()
 
-    // Bereinigen und parsen
     let recipe
     try {
       recipe = JSON.parse(sanitizeJson(rawText))
     } catch {
-      // Fallback: JSON-Block extrahieren
       try {
         const match = rawText.match(/\{[\s\S]*\}/)
         if (match) {
@@ -92,6 +109,29 @@ serve(async (req) => {
       } catch {
         recipe = emptyRecipe
       }
+    }
+
+    // Sicherstellen dass steps ein Array von Strings ist
+    if (recipe.steps && Array.isArray(recipe.steps)) {
+      recipe.steps = recipe.steps
+        .map((s: any) => typeof s === 'string' ? s.trim() : String(s).trim())
+        .filter((s: string) => s.length > 0)
+    } else {
+      recipe.steps = []
+    }
+
+    // Sicherstellen dass ingredients valide sind
+    if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+      recipe.ingredients = recipe.ingredients
+        .filter((i: any) => i.name?.trim())
+        .map((i: any) => ({
+          name: i.name?.trim() || '',
+          amount: i.amount || null,
+          unit: i.unit?.trim() || '',
+          category: i.category || 'Sonstiges'
+        }))
+    } else {
+      recipe.ingredients = []
     }
 
     return new Response(
