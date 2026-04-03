@@ -26,22 +26,22 @@ export const useRecipeStore = create((set, get) => ({
     if (error) throw error
 
     if (ingredients?.length) {
-      const validIngredients = ingredients.filter(i => i.name?.trim())
-      if (validIngredients.length) {
+      const valid = ingredients.filter(i => i.name?.trim())
+      if (valid.length) {
         await supabase.from('ingredients').insert(
-          validIngredients.map(ing => ({ ...ing, recipe_id: newRecipe.id }))
+          valid.map(ing => ({ ...ing, recipe_id: newRecipe.id }))
         )
       }
     }
 
     const stepsData = steps || recipe_steps
     if (stepsData?.length) {
-      const validSteps = stepsData.filter(s =>
+      const valid = stepsData.filter(s =>
         typeof s === 'string' ? s.trim() : s.description?.trim()
       )
-      if (validSteps.length) {
+      if (valid.length) {
         await supabase.from('recipe_steps').insert(
-          validSteps.map((s, i) => ({
+          valid.map((s, i) => ({
             recipe_id: newRecipe.id,
             step_number: typeof s === 'string' ? i + 1 : (s.step_number || i + 1),
             description: typeof s === 'string' ? s : s.description
@@ -61,10 +61,10 @@ export const useRecipeStore = create((set, get) => ({
 
     if (ingredients) {
       await supabase.from('ingredients').delete().eq('recipe_id', id)
-      const validIngredients = ingredients.filter(i => i.name?.trim())
-      if (validIngredients.length) {
+      const valid = ingredients.filter(i => i.name?.trim())
+      if (valid.length) {
         await supabase.from('ingredients').insert(
-          validIngredients.map(ing => ({ ...ing, recipe_id: id }))
+          valid.map(ing => ({ ...ing, recipe_id: id }))
         )
       }
     }
@@ -72,12 +72,12 @@ export const useRecipeStore = create((set, get) => ({
     const stepsData = steps || recipe_steps
     if (stepsData) {
       await supabase.from('recipe_steps').delete().eq('recipe_id', id)
-      const validSteps = stepsData.filter(s =>
+      const valid = stepsData.filter(s =>
         typeof s === 'string' ? s.trim() : s.description?.trim()
       )
-      if (validSteps.length) {
+      if (valid.length) {
         await supabase.from('recipe_steps').insert(
-          validSteps.map((s, i) => ({
+          valid.map((s, i) => ({
             recipe_id: id,
             step_number: typeof s === 'string' ? i + 1 : (s.step_number || i + 1),
             description: typeof s === 'string' ? s : s.description
@@ -87,6 +87,29 @@ export const useRecipeStore = create((set, get) => ({
     }
 
     await get().fetchRecipes(householdId)
+  },
+
+  toggleFavorite: async (id, householdId) => {
+    const recipe = get().recipes.find(r => r.id === id)
+    if (!recipe) return
+    const newVal = !recipe.is_favorite
+    await supabase.from('recipes').update({ is_favorite: newVal }).eq('id', id)
+    set({
+      recipes: get().recipes.map(r =>
+        r.id === id ? { ...r, is_favorite: newVal } : r
+      )
+    })
+  },
+
+  setRating: async (id, rating, householdId) => {
+    const current = get().recipes.find(r => r.id === id)
+    const newRating = current?.rating === rating ? null : rating
+    await supabase.from('recipes').update({ rating: newRating }).eq('id', id)
+    set({
+      recipes: get().recipes.map(r =>
+        r.id === id ? { ...r, rating: newRating } : r
+      )
+    })
   },
 
   deleteRecipe: async (id, householdId) => {
