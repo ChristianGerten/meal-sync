@@ -54,7 +54,7 @@ serve(async (req) => {
               },
               {
                 type: 'text',
-                text: 'Extract the recipe from this image. Return ONLY a single-line JSON object with no newlines inside string values. Use this exact format: {"name":"","description":"","category":"","servings":2,"prep_time":null,"cook_time":null,"tags":[],"ingredients":[{"name":"","amount":null,"unit":"","category":"Sonstiges"}]} Categories for ingredients: Gemüse, Obst, Fleisch, Fisch, Kühlregal, Milchprodukte, Nudeln, Reis & Getreide, Konserven, Gewürze, Backen, Sonstiges. If no recipe is found return the empty template. ONLY JSON, nothing else.'
+                text: 'Extract the recipe from this image. Return ONLY a single-line JSON object with no newlines inside string values. Use this exact format: {"name":"","description":"","category":"","servings":2,"prep_time":null,"cook_time":null,"tags":[],"ingredients":[{"name":"","amount":null,"unit":"","category":"Sonstiges"}],"steps":["Schritt 1 Beschreibung","Schritt 2 Beschreibung"]} Ingredient categories: Gemüse, Obst, Fleisch, Fisch, Kühlregal, Milchprodukte, Nudeln, Reis & Getreide, Konserven, Gewürze, Backen, Sonstiges. Extract ALL preparation steps from the image into the steps array as plain strings. If no recipe is found return the empty template. ONLY JSON, nothing else.'
               }
             ]
           },

@@ -26,20 +26,28 @@ export const useRecipeStore = create((set, get) => ({
     if (error) throw error
 
     if (ingredients?.length) {
-      await supabase.from('ingredients').insert(
-        ingredients.map(ing => ({ ...ing, recipe_id: newRecipe.id }))
-      )
+      const validIngredients = ingredients.filter(i => i.name?.trim())
+      if (validIngredients.length) {
+        await supabase.from('ingredients').insert(
+          validIngredients.map(ing => ({ ...ing, recipe_id: newRecipe.id }))
+        )
+      }
     }
 
     const stepsData = steps || recipe_steps
     if (stepsData?.length) {
-      await supabase.from('recipe_steps').insert(
-        stepsData.map((s, i) => ({
-          recipe_id: newRecipe.id,
-          step_number: s.step_number || i + 1,
-          description: s.description || s
-        }))
+      const validSteps = stepsData.filter(s =>
+        typeof s === 'string' ? s.trim() : s.description?.trim()
       )
+      if (validSteps.length) {
+        await supabase.from('recipe_steps').insert(
+          validSteps.map((s, i) => ({
+            recipe_id: newRecipe.id,
+            step_number: typeof s === 'string' ? i + 1 : (s.step_number || i + 1),
+            description: typeof s === 'string' ? s : s.description
+          }))
+        )
+      }
     }
 
     await get().fetchRecipes(householdId)
@@ -53,20 +61,26 @@ export const useRecipeStore = create((set, get) => ({
 
     if (ingredients) {
       await supabase.from('ingredients').delete().eq('recipe_id', id)
-      await supabase.from('ingredients').insert(
-        ingredients.map(ing => ({ ...ing, recipe_id: id }))
-      )
+      const validIngredients = ingredients.filter(i => i.name?.trim())
+      if (validIngredients.length) {
+        await supabase.from('ingredients').insert(
+          validIngredients.map(ing => ({ ...ing, recipe_id: id }))
+        )
+      }
     }
 
     const stepsData = steps || recipe_steps
     if (stepsData) {
       await supabase.from('recipe_steps').delete().eq('recipe_id', id)
-      if (stepsData.length) {
+      const validSteps = stepsData.filter(s =>
+        typeof s === 'string' ? s.trim() : s.description?.trim()
+      )
+      if (validSteps.length) {
         await supabase.from('recipe_steps').insert(
-          stepsData.map((s, i) => ({
+          validSteps.map((s, i) => ({
             recipe_id: id,
-            step_number: s.step_number || i + 1,
-            description: s.description || s
+            step_number: typeof s === 'string' ? i + 1 : (s.step_number || i + 1),
+            description: typeof s === 'string' ? s : s.description
           }))
         )
       }
