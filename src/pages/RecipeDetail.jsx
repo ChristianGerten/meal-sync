@@ -264,22 +264,22 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
           </div>
         )}
 
-        {recipe.source_url && (
-          
-            href={recipe.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'block', padding: '10px 14px',
-              background: 'var(--color-surface)',
-              border: '0.5px solid var(--color-border)',
-              borderRadius: '12px', fontSize: '13px',
-              color: 'var(--color-accent)', textDecoration: 'none'
-            }}
-          >
-            🔗 Originalrezept öffnen
-          </a>
-        )}
+{recipe.source_url && (
+  
+    href={String(recipe.source_url)}
+    target="_blank"
+    rel="noopener noreferrer"
+    style={{
+      display: 'block', padding: '10px 14px',
+      background: 'var(--color-surface)',
+      border: '0.5px solid var(--color-border)',
+      borderRadius: '12px', fontSize: '13px',
+      color: 'var(--color-accent)', textDecoration: 'none'
+    }}
+  >
+    🔗 Originalrezept öffnen
+  </a>
+)}
       </div>
     </div>
   )
