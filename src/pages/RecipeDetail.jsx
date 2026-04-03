@@ -261,7 +261,7 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
         )}
 
         {sourceUrl.length > 0 && (
-          
+        <a>  
             href={sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
