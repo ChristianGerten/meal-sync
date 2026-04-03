@@ -22,8 +22,8 @@ function StarRating({ rating, onRate, size = 16 }) {
           onMouseEnter={() => setHover(star)}
           onMouseLeave={() => setHover(0)}
           style={{
-            background: 'none', border: 'none',
-            cursor: 'pointer', padding: '2px',
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '2px',
             color: star <= (hover || rating || 0) ? '#f59e0b' : 'var(--color-border)',
             transition: 'color 0.1s'
           }}
@@ -44,7 +44,7 @@ export default function Recipes() {
   const { recipes, fetchRecipes, loading, toggleFavorite, setRating } = useRecipeStore()
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('Alle')
-  const [sortBy, setSortBy] = useState('name') // 'name' | 'rating' | 'favorites'
+  const [sortBy, setSortBy] = useState('name')
   const [showImport, setShowImport] = useState(false)
   const [showSort, setShowSort] = useState(false)
   const navigate = useNavigate()
@@ -113,7 +113,9 @@ export default function Recipes() {
           <button onClick={() => setShowSort(s => !s)} style={{
             width: '42px', height: '42px',
             background: showSort ? 'var(--color-accent-soft)' : 'var(--color-surface)',
-            border: showSort ? '0.5px solid var(--color-accent)' : '0.5px solid var(--color-border)',
+            border: showSort
+              ? '0.5px solid var(--color-accent)'
+              : '0.5px solid var(--color-border)',
             borderRadius: '12px', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: showSort ? 'var(--color-accent)' : 'var(--color-text-muted)'
@@ -126,20 +128,21 @@ export default function Recipes() {
               background: 'var(--color-surface)',
               border: '0.5px solid var(--color-border)',
               borderRadius: '12px', overflow: 'hidden',
-              minWidth: '160px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+              minWidth: '160px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
             }}>
               {[
                 { key: 'name', label: 'A–Z' },
                 { key: 'rating', label: 'Beste Bewertung' },
                 { key: 'favorites', label: 'Favoriten zuerst' }
-              ].map(opt => (
+              ].map((opt, idx) => (
                 <button key={opt.key} onClick={() => { setSortBy(opt.key); setShowSort(false) }} style={{
                   width: '100%', padding: '11px 14px', textAlign: 'left',
                   background: sortBy === opt.key ? 'var(--color-accent-soft)' : 'none',
                   border: 'none', cursor: 'pointer', fontSize: '13px',
                   color: sortBy === opt.key ? 'var(--color-accent-text)' : 'var(--color-text)',
                   fontWeight: sortBy === opt.key ? '500' : '400',
-                  borderBottom: '0.5px solid var(--color-border)'
+                  borderBottom: idx < 2 ? '0.5px solid var(--color-border)' : 'none'
                 }}>
                   {opt.label}
                 </button>
@@ -154,7 +157,9 @@ export default function Recipes() {
           border: '0.5px solid var(--color-border)',
           borderRadius: '12px', cursor: 'pointer', fontSize: '18px',
           display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>📥</button>
+        }}>
+          📥
+        </button>
 
         <button onClick={() => navigate('/recipes/new')} style={{
           width: '42px', height: '42px',
@@ -197,16 +202,52 @@ export default function Recipes() {
 
       {/* Rezept Grid */}
       {loading ? (
-        <div style={{textAlign: 'center', padding: '48px', color: 'var(--color-text-muted)'}}>
-          Lade Rezepte...
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px'
+        }}>
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} style={{
+              background: 'var(--color-surface)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: '16px', overflow: 'hidden'
+            }}>
+              <div style={{
+                aspectRatio: '4/3',
+                background: 'var(--color-surface-2)',
+                animation: 'pulse 1.5s ease-in-out infinite'
+              }} />
+              <div style={{padding: '10px'}}>
+                <div style={{
+                  height: '14px', background: 'var(--color-surface-2)',
+                  borderRadius: '4px', marginBottom: '6px',
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }} />
+                <div style={{
+                  height: '10px', background: 'var(--color-surface-2)',
+                  borderRadius: '4px', width: '60%',
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }} />
+              </div>
+            </div>
+          ))}
+          <style>{`
+            @keyframes pulse {
+              0%, 100% { opacity: 1; }
+              50% { opacity: 0.5; }
+            }
+          `}</style>
         </div>
       ) : filtered.length === 0 ? (
         <div style={{textAlign: 'center', padding: '48px'}}>
           <div style={{fontSize: '48px', marginBottom: '12px'}}>👨‍🍳</div>
-          <p style={{fontWeight: '600', color: 'var(--color-text)', marginBottom: '6px'}}>
+          <p style={{
+            fontWeight: '600', color: 'var(--color-text)', marginBottom: '6px'
+          }}>
             {activeCategory === 'Favoriten' ? 'Noch keine Favoriten' : 'Keine Rezepte gefunden'}
           </p>
-          <p style={{fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '16px'}}>
+          <p style={{
+            fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '16px'
+          }}>
             {activeCategory === 'Favoriten'
               ? 'Tippe auf das Herz bei einem Rezept'
               : 'Füge dein erstes Rezept hinzu'}
@@ -245,8 +286,13 @@ export default function Recipes() {
                 overflow: 'hidden', position: 'relative'
               }}>
                 {recipe.image_url
-                  ? <img src={recipe.image_url} alt={recipe.name}
-                      style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                  ? <img
+                      src={recipe.image_url}
+                      alt={recipe.name}
+                      loading="lazy"
+                      decoding="async"
+                      style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                    />
                   : '🍽️'
                 }
 
@@ -260,7 +306,6 @@ export default function Recipes() {
                     position: 'absolute', top: '8px', right: '8px',
                     width: '30px', height: '30px', borderRadius: '50%',
                     background: 'rgba(0,0,0,0.3)',
-                    backdropFilter: 'blur(4px)',
                     border: 'none', cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center'
                   }}
@@ -278,12 +323,13 @@ export default function Recipes() {
                   <div style={{
                     position: 'absolute', bottom: '8px', left: '8px',
                     background: 'rgba(0,0,0,0.5)',
-                    backdropFilter: 'blur(4px)',
                     borderRadius: '20px', padding: '2px 7px',
                     display: 'flex', alignItems: 'center', gap: '3px'
                   }}>
                     <Star size={11} fill="#f59e0b" color="#f59e0b" />
-                    <span style={{fontSize: '11px', color: '#fff', fontWeight: '600'}}>
+                    <span style={{
+                      fontSize: '11px', color: '#fff', fontWeight: '600'
+                    }}>
                       {recipe.rating}
                     </span>
                   </div>
@@ -328,7 +374,7 @@ export default function Recipes() {
       {showImport && (
         <ImportModal onClose={() => {
           setShowImport(false)
-          if (household) fetchRecipes(household.id)
+          if (household) fetchRecipes(household.id, true)
         }} />
       )}
     </div>

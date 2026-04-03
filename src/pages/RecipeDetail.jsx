@@ -42,7 +42,7 @@ const parseIngredientLine = (line) => {
   return { name: clean, amount: null, unit: '', category: 'Sonstiges' }
 }
 
-// ── Ansicht-Modus ────────────────────────────────────────────
+// ── Ansicht-Modus ─────────────────────────────────────────────
 function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
   const steps = [...(recipe.recipe_steps || [])].sort((a, b) => a.step_number - b.step_number)
 
@@ -77,7 +77,8 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
         </button>
         <button onClick={onEdit} style={{
           display: 'flex', alignItems: 'center', gap: '6px',
-          padding: '8px 14px', background: 'var(--color-surface-2)',
+          padding: '8px 14px',
+          background: 'var(--color-surface-2)',
           border: '0.5px solid var(--color-border)',
           borderRadius: '10px', cursor: 'pointer',
           fontSize: '13px', color: 'var(--color-text-muted)'
@@ -103,10 +104,16 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
 
         {/* Bild */}
         {recipe.image_url && (
-          <img src={recipe.image_url} alt={recipe.name} style={{
-            width: '100%', height: '200px', objectFit: 'cover',
-            borderRadius: '16px', border: '0.5px solid var(--color-border)'
-          }} />
+          <img
+            src={recipe.image_url}
+            alt={recipe.name}
+            loading="lazy"
+            decoding="async"
+            style={{
+              width: '100%', height: '200px', objectFit: 'cover',
+              borderRadius: '16px', border: '0.5px solid var(--color-border)'
+            }}
+          />
         )}
 
         {/* Basis-Info */}
@@ -116,9 +123,7 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
           border: '0.5px solid var(--color-border)',
           display: 'flex', flexDirection: 'column', gap: '10px'
         }}>
-          <div style={{
-            display: 'flex', flexWrap: 'wrap', gap: '8px'
-          }}>
+          <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px'}}>
             {recipe.category && (
               <span style={{
                 fontSize: '13px', padding: '4px 12px',
@@ -208,7 +213,9 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
                       fontSize: '14px', fontWeight: '700',
                       color: 'var(--color-text)', marginLeft: '8px'
                     }}>
-                      {ing.amount && `${Number(ing.amount) % 1 === 0 ? Number(ing.amount) : Number(ing.amount).toFixed(1)}`}
+                      {ing.amount && `${Number(ing.amount) % 1 === 0
+                        ? Number(ing.amount)
+                        : Number(ing.amount).toFixed(1)}`}
                       {ing.unit && ` ${ing.unit}`}
                     </span>
                   )}
@@ -236,9 +243,7 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
             </div>
             <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
               {steps.map((step, i) => (
-                <div key={i} style={{
-                  display: 'flex', gap: '12px', alignItems: 'flex-start'
-                }}>
+                <div key={i} style={{display: 'flex', gap: '12px', alignItems: 'flex-start'}}>
                   <div style={{
                     width: '26px', height: '26px', borderRadius: '50%',
                     background: 'var(--color-accent)', color: '#fff',
@@ -260,13 +265,18 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
         )}
 
         {recipe.source_url && (
-          <a href={recipe.source_url} target="_blank" rel="noopener noreferrer" style={{
-            display: 'block', padding: '10px 14px',
-            background: 'var(--color-surface)',
-            border: '0.5px solid var(--color-border)',
-            borderRadius: '12px', fontSize: '13px',
-            color: 'var(--color-accent)', textDecoration: 'none'
-          }}>
+          
+            href={recipe.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'block', padding: '10px 14px',
+              background: 'var(--color-surface)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: '12px', fontSize: '13px',
+              color: 'var(--color-accent)', textDecoration: 'none'
+            }}
+          >
             🔗 Originalrezept öffnen
           </a>
         )}
@@ -275,7 +285,7 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
   )
 }
 
-// ── Bearbeiten-Modus ─────────────────────────────────────────
+// ── Bearbeiten-Modus ──────────────────────────────────────────
 function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadImage }) {
   const [form, setForm] = useState({
     name: recipe?.name || '',
@@ -376,7 +386,8 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
           <ArrowLeft size={20} />
         </button>
         <span style={{
-          fontWeight: '600', fontSize: '16px', color: 'var(--color-text)', flex: 1
+          fontWeight: '600', fontSize: '16px',
+          color: 'var(--color-text)', flex: 1
         }}>
           {isNew ? 'Neues Rezept' : 'Bearbeiten'}
         </span>
@@ -404,7 +415,11 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
           }}>
             {form.image_url ? (
               <>
-                <img src={form.image_url} alt="" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                <img
+                  src={form.image_url} alt=""
+                  loading="lazy" decoding="async"
+                  style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                />
                 <div style={{
                   position: 'absolute', bottom: '8px', right: '8px',
                   background: 'rgba(0,0,0,0.5)', borderRadius: '8px',
@@ -430,43 +445,72 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
           value={form.name}
           onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
           placeholder="Rezeptname *"
-          style={{...inputStyle, fontSize: '16px', fontWeight: '500', padding: '13px 16px', borderRadius: '12px'}}
+          style={{
+            ...inputStyle,
+            fontSize: '16px', fontWeight: '500',
+            padding: '13px 16px', borderRadius: '12px'
+          }}
         />
 
         {/* Portionen */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '12px',
-          background: 'var(--color-surface)', border: '0.5px solid var(--color-border)',
+          background: 'var(--color-surface)',
+          border: '0.5px solid var(--color-border)',
           borderRadius: '12px', padding: '10px 16px'
         }}>
-          <span style={{fontSize: '13px', color: 'var(--color-text-muted)', flex: 1}}>Portionen</span>
-          <button onClick={() => setForm(f => ({ ...f, servings: Math.max(1, f.servings - 1) }))} style={{
-            width: '30px', height: '30px', borderRadius: '8px',
-            background: 'var(--color-surface-2)', border: '0.5px solid var(--color-border)',
-            cursor: 'pointer', fontSize: '18px', color: 'var(--color-text)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>−</button>
-          <span style={{fontSize: '16px', fontWeight: '600', color: 'var(--color-text)', minWidth: '24px', textAlign: 'center'}}>
+          <span style={{fontSize: '13px', color: 'var(--color-text-muted)', flex: 1}}>
+            Portionen
+          </span>
+          <button
+            onClick={() => setForm(f => ({ ...f, servings: Math.max(1, f.servings - 1) }))}
+            style={{
+              width: '30px', height: '30px', borderRadius: '8px',
+              background: 'var(--color-surface-2)',
+              border: '0.5px solid var(--color-border)',
+              cursor: 'pointer', fontSize: '18px', color: 'var(--color-text)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}
+          >−</button>
+          <span style={{
+            fontSize: '16px', fontWeight: '600', color: 'var(--color-text)',
+            minWidth: '24px', textAlign: 'center'
+          }}>
             {form.servings}
           </span>
-          <button onClick={() => setForm(f => ({ ...f, servings: f.servings + 1 }))} style={{
-            width: '30px', height: '30px', borderRadius: '8px',
-            background: 'var(--color-surface-2)', border: '0.5px solid var(--color-border)',
-            cursor: 'pointer', fontSize: '18px', color: 'var(--color-text)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>+</button>
+          <button
+            onClick={() => setForm(f => ({ ...f, servings: f.servings + 1 }))}
+            style={{
+              width: '30px', height: '30px', borderRadius: '8px',
+              background: 'var(--color-surface-2)',
+              border: '0.5px solid var(--color-border)',
+              cursor: 'pointer', fontSize: '18px', color: 'var(--color-text)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}
+          >+</button>
         </div>
 
         {/* Kategorie */}
         <div>
-          <div style={{fontSize: '12px', fontWeight: '600', color: 'var(--color-text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px'}}>Kategorie</div>
+          <div style={{
+            fontSize: '12px', fontWeight: '600',
+            color: 'var(--color-text-muted)', marginBottom: '8px',
+            textTransform: 'uppercase', letterSpacing: '0.5px'
+          }}>
+            Kategorie
+          </div>
           <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
             {CATEGORIES.map(cat => (
-              <button key={cat} onClick={() => setForm(f => ({ ...f, category: f.category === cat ? '' : cat }))} style={{
-                padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px',
+              <button key={cat} onClick={() => setForm(f => ({
+                ...f, category: f.category === cat ? '' : cat
+              }))} style={{
+                padding: '7px 14px', borderRadius: '20px',
+                cursor: 'pointer', fontSize: '12px',
                 background: form.category === cat ? 'var(--color-accent)' : 'var(--color-surface)',
                 color: form.category === cat ? '#fff' : 'var(--color-text-muted)',
-                border: form.category === cat ? '2px solid var(--color-accent)' : '0.5px solid var(--color-border)',
+                border: form.category === cat
+                  ? '2px solid var(--color-accent)'
+                  : '0.5px solid var(--color-border)',
                 transition: 'all 0.15s'
               }}>
                 {cat}
@@ -477,14 +521,27 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
 
         {/* Tags */}
         <div>
-          <div style={{fontSize: '12px', fontWeight: '600', color: 'var(--color-text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px'}}>Tags</div>
+          <div style={{
+            fontSize: '12px', fontWeight: '600',
+            color: 'var(--color-text-muted)', marginBottom: '8px',
+            textTransform: 'uppercase', letterSpacing: '0.5px'
+          }}>
+            Tags
+          </div>
           <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
             {TAGS.map(tag => (
               <button key={tag} onClick={() => toggleTag(tag)} style={{
-                padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px',
-                background: form.tags.includes(tag) ? 'var(--color-accent-soft)' : 'var(--color-surface)',
-                color: form.tags.includes(tag) ? 'var(--color-accent-text)' : 'var(--color-text-muted)',
-                border: form.tags.includes(tag) ? '1.5px solid var(--color-accent)' : '0.5px solid var(--color-border)',
+                padding: '7px 14px', borderRadius: '20px',
+                cursor: 'pointer', fontSize: '12px',
+                background: form.tags.includes(tag)
+                  ? 'var(--color-accent-soft)'
+                  : 'var(--color-surface)',
+                color: form.tags.includes(tag)
+                  ? 'var(--color-accent-text)'
+                  : 'var(--color-text-muted)',
+                border: form.tags.includes(tag)
+                  ? '1.5px solid var(--color-accent)'
+                  : '0.5px solid var(--color-border)',
                 transition: 'all 0.15s'
               }}>
                 {tag}
@@ -497,31 +554,70 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
 
         {/* Zutaten */}
         <div>
-          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px'}}>
-            <span style={{fontSize: '14px', fontWeight: '600', color: 'var(--color-text)'}}>Zutaten</span>
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', marginBottom: '10px'
+          }}>
+            <span style={{fontSize: '14px', fontWeight: '600', color: 'var(--color-text)'}}>
+              Zutaten
+            </span>
             <button onClick={() => setQuickMode(q => !q)} style={{
               fontSize: '11px', padding: '5px 10px',
               background: quickMode ? 'var(--color-accent-soft)' : 'var(--color-surface-2)',
               color: quickMode ? 'var(--color-accent-text)' : 'var(--color-text-muted)',
-              border: '0.5px solid var(--color-border)', borderRadius: '20px', cursor: 'pointer'
+              border: '0.5px solid var(--color-border)',
+              borderRadius: '20px', cursor: 'pointer'
             }}>
               ⚡ Schnelleingabe
             </button>
           </div>
 
           {quickMode && (
-            <div style={{background: 'var(--color-accent-soft)', borderRadius: '12px', padding: '12px', marginBottom: '12px', border: '0.5px solid var(--color-border)'}}>
-              <p style={{fontSize: '11px', color: 'var(--color-accent-text)', marginBottom: '8px', lineHeight: '1.5'}}>
+            <div style={{
+              background: 'var(--color-accent-soft)',
+              borderRadius: '12px', padding: '12px',
+              marginBottom: '12px',
+              border: '0.5px solid var(--color-border)'
+            }}>
+              <p style={{
+                fontSize: '11px', color: 'var(--color-accent-text)',
+                marginBottom: '8px', lineHeight: '1.5'
+              }}>
                 Eine Zutat pro Zeile — z.B. "200g Spaghetti", "3 Eier", "Salz"
               </p>
               <textarea
-                value={quickInput} onChange={e => setQuickInput(e.target.value)}
-                placeholder={'200g Spaghetti\n3 Eier\n100g Speck'} rows={4}
-                style={{width: '100%', padding: '10px', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: '8px', fontSize: '13px', color: 'var(--color-text)', outline: 'none', resize: 'none', boxSizing: 'border-box', fontFamily: 'monospace'}}
+                value={quickInput}
+                onChange={e => setQuickInput(e.target.value)}
+                placeholder={'200g Spaghetti\n3 Eier\n100g Speck'}
+                rows={4}
+                style={{
+                  width: '100%', padding: '10px',
+                  background: 'var(--color-surface)',
+                  border: '0.5px solid var(--color-border)',
+                  borderRadius: '8px', fontSize: '13px',
+                  color: 'var(--color-text)', outline: 'none',
+                  resize: 'none', boxSizing: 'border-box',
+                  fontFamily: 'monospace'
+                }}
               />
               <div style={{display: 'flex', gap: '8px', marginTop: '8px'}}>
-                <button onClick={handleQuickInput} style={{flex: 1, padding: '10px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '500'}}>Übernehmen</button>
-                <button onClick={() => { setQuickMode(false); setQuickInput('') }} style={{padding: '10px 14px', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--color-text-muted)'}}>Abbrechen</button>
+                <button onClick={handleQuickInput} style={{
+                  flex: 1, padding: '10px',
+                  background: 'var(--color-accent)', color: '#fff',
+                  border: 'none', borderRadius: '8px',
+                  cursor: 'pointer', fontSize: '13px', fontWeight: '500'
+                }}>
+                  Übernehmen
+                </button>
+                <button onClick={() => { setQuickMode(false); setQuickInput('') }} style={{
+                  padding: '10px 14px',
+                  background: 'var(--color-surface)',
+                  border: '0.5px solid var(--color-border)',
+                  borderRadius: '8px', cursor: 'pointer',
+                  fontSize: '13px', color: 'var(--color-text-muted)'
+                }}>
+                  Abbrechen
+                </button>
               </div>
             </div>
           )}
@@ -529,22 +625,55 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
           <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
             {ingredients.map((ing, i) => (
               <div key={i} style={{display: 'flex', gap: '5px', alignItems: 'center'}}>
-                <input value={ing.amount || ''} onChange={e => updateIng(i, 'amount', e.target.value)} placeholder="Menge" type="number" style={{...inputStyle, width: '58px', padding: '9px 6px', textAlign: 'center'}} />
-                <select value={ing.unit || ''} onChange={e => updateIng(i, 'unit', e.target.value)} style={{...inputStyle, width: '68px', padding: '9px 4px'}}>
+                <input
+                  value={ing.amount || ''}
+                  onChange={e => updateIng(i, 'amount', e.target.value)}
+                  placeholder="Menge" type="number"
+                  style={{...inputStyle, width: '58px', padding: '9px 6px', textAlign: 'center'}}
+                />
+                <select
+                  value={ing.unit || ''}
+                  onChange={e => updateIng(i, 'unit', e.target.value)}
+                  style={{...inputStyle, width: '68px', padding: '9px 4px'}}
+                >
                   <option value="">—</option>
                   {UNITS.map(u => <option key={u}>{u}</option>)}
                 </select>
-                <input value={ing.name} onChange={e => updateIng(i, 'name', e.target.value)} placeholder="Zutat *" style={{...inputStyle, flex: 1}} />
-                <select value={ing.category || 'Sonstiges'} onChange={e => updateIng(i, 'category', e.target.value)} style={{...inputStyle, width: '88px', padding: '9px 4px', fontSize: '11px'}}>
+                <input
+                  value={ing.name}
+                  onChange={e => updateIng(i, 'name', e.target.value)}
+                  placeholder="Zutat *"
+                  style={{...inputStyle, flex: 1}}
+                />
+                <select
+                  value={ing.category || 'Sonstiges'}
+                  onChange={e => updateIng(i, 'category', e.target.value)}
+                  style={{...inputStyle, width: '88px', padding: '9px 4px', fontSize: '11px'}}
+                >
                   {CATEGORIES_ING.map(c => <option key={c}>{c}</option>)}
                 </select>
-                <button onClick={() => setIngredients(ingredients.filter((_, j) => j !== i))} style={{background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center'}}>
+                <button
+                  onClick={() => setIngredients(ingredients.filter((_, j) => j !== i))}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    padding: '6px', color: 'var(--color-text-muted)',
+                    display: 'flex', alignItems: 'center'
+                  }}
+                >
                   <X size={15} />
                 </button>
               </div>
             ))}
           </div>
-          <button onClick={() => setIngredients([...ingredients, emptyIngredient()])} style={{marginTop: '10px', display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--color-accent)', padding: '4px 0'}}>
+
+          <button
+            onClick={() => setIngredients([...ingredients, emptyIngredient()])}
+            style={{
+              marginTop: '10px', display: 'flex', alignItems: 'center', gap: '5px',
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: '13px', color: 'var(--color-accent)', padding: '4px 0'
+            }}
+          >
             <Plus size={14} /> Zutat hinzufügen
           </button>
         </div>
@@ -553,9 +682,13 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
 
         {/* Zubereitungsschritte */}
         <div>
-          <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'}}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'
+          }}>
             <ChefHat size={16} color="var(--color-accent)" />
-            <span style={{fontSize: '14px', fontWeight: '600', color: 'var(--color-text)'}}>Zubereitungsschritte</span>
+            <span style={{fontSize: '14px', fontWeight: '600', color: 'var(--color-text)'}}>
+              Zubereitungsschritte
+            </span>
           </div>
           <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
             {steps.map((step, i) => (
@@ -566,24 +699,52 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
                   border: step.trim() ? 'none' : '0.5px solid var(--color-border)',
                   color: step.trim() ? '#fff' : 'var(--color-text-muted)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '12px', fontWeight: '600', flexShrink: 0, marginTop: '9px', transition: 'background 0.2s'
+                  fontSize: '12px', fontWeight: '600', flexShrink: 0,
+                  marginTop: '9px', transition: 'background 0.2s'
                 }}>
                   {i + 1}
                 </div>
                 <textarea
-                  value={step} onChange={e => { const copy = [...steps]; copy[i] = e.target.value; setSteps(copy) }}
-                  placeholder={`Schritt ${i + 1}…`} rows={2}
-                  style={{flex: 1, padding: '10px 12px', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: '10px', fontSize: '13px', color: 'var(--color-text)', outline: 'none', resize: 'none', lineHeight: '1.5', boxSizing: 'border-box'}}
+                  value={step}
+                  onChange={e => {
+                    const copy = [...steps]
+                    copy[i] = e.target.value
+                    setSteps(copy)
+                  }}
+                  placeholder={`Schritt ${i + 1}…`}
+                  rows={2}
+                  style={{
+                    flex: 1, padding: '10px 12px',
+                    background: 'var(--color-surface)',
+                    border: '0.5px solid var(--color-border)',
+                    borderRadius: '10px', fontSize: '13px',
+                    color: 'var(--color-text)', outline: 'none',
+                    resize: 'none', lineHeight: '1.5', boxSizing: 'border-box'
+                  }}
                 />
                 {steps.length > 1 && (
-                  <button onClick={() => setSteps(steps.filter((_, j) => j !== i))} style={{background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--color-text-muted)', marginTop: '6px', display: 'flex', alignItems: 'center'}}>
+                  <button
+                    onClick={() => setSteps(steps.filter((_, j) => j !== i))}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      padding: '6px', color: 'var(--color-text-muted)',
+                      marginTop: '6px', display: 'flex', alignItems: 'center'
+                    }}
+                  >
                     <X size={15} />
                   </button>
                 )}
               </div>
             ))}
           </div>
-          <button onClick={() => setSteps([...steps, ''])} style={{marginTop: '10px', display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--color-accent)', padding: '4px 0'}}>
+          <button
+            onClick={() => setSteps([...steps, ''])}
+            style={{
+              marginTop: '10px', display: 'flex', alignItems: 'center', gap: '5px',
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: '13px', color: 'var(--color-accent)', padding: '4px 0'
+            }}
+          >
             <Plus size={14} /> Schritt hinzufügen
           </button>
         </div>
@@ -592,11 +753,26 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
 
         {/* Notizen */}
         <div>
-          <div style={{fontSize: '12px', fontWeight: '600', color: 'var(--color-text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px'}}>Notizen & Tipps</div>
+          <div style={{
+            fontSize: '12px', fontWeight: '600',
+            color: 'var(--color-text-muted)', marginBottom: '8px',
+            textTransform: 'uppercase', letterSpacing: '0.5px'
+          }}>
+            Notizen & Tipps
+          </div>
           <textarea
-            value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-            placeholder="Variationen, Tipps, Hinweise..." rows={3}
-            style={{width: '100%', padding: '12px 14px', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: '12px', fontSize: '13px', color: 'var(--color-text)', outline: 'none', resize: 'none', boxSizing: 'border-box', lineHeight: '1.5'}}
+            value={form.description}
+            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+            placeholder="Variationen, Tipps, Hinweise..."
+            rows={3}
+            style={{
+              width: '100%', padding: '12px 14px',
+              background: 'var(--color-surface)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: '12px', fontSize: '13px',
+              color: 'var(--color-text)', outline: 'none',
+              resize: 'none', boxSizing: 'border-box', lineHeight: '1.5'
+            }}
           />
         </div>
       </div>
@@ -604,17 +780,25 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
   )
 }
 
-// ── Haupt-Komponente ─────────────────────────────────────────
+// ── Haupt-Komponente ──────────────────────────────────────────
 export default function RecipeDetail() {
   const { id } = useParams()
   const isNew = id === 'new'
   const navigate = useNavigate()
   const household = useAuthStore(s => s.household)
   const user = useAuthStore(s => s.user)
-  const { recipes, addRecipe, updateRecipe, deleteRecipe, uploadImage } = useRecipeStore()
+  const { recipes, addRecipe, updateRecipe, deleteRecipe, uploadImage, fetchRecipeDetails } = useRecipeStore()
 
   const existing = recipes.find(r => r.id === id)
   const [editMode, setEditMode] = useState(isNew)
+  const [detailsLoading, setDetailsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!isNew && id && !existing?.ingredients) {
+      setDetailsLoading(true)
+      fetchRecipeDetails(id).finally(() => setDetailsLoading(false))
+    }
+  }, [id, isNew])
 
   const handleSave = async (data) => {
     if (isNew) {
@@ -633,8 +817,21 @@ export default function RecipeDetail() {
   }
 
   if (!isNew && !existing) return (
-    <div style={{padding: '32px', textAlign: 'center', color: 'var(--color-text-muted)'}}>
+    <div style={{
+      padding: '32px', textAlign: 'center',
+      color: 'var(--color-text-muted)'
+    }}>
       Rezept nicht gefunden
+    </div>
+  )
+
+  if (detailsLoading) return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      height: '60vh', flexDirection: 'column', gap: '12px'
+    }}>
+      <div style={{fontSize: '32px'}}>🍳</div>
+      <p style={{color: 'var(--color-text-muted)', fontSize: '14px'}}>Lade Rezept...</p>
     </div>
   )
 

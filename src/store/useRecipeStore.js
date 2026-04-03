@@ -5,17 +5,61 @@ import { toast } from '../components/Toast'
 export const useRecipeStore = create((set, get) => ({
   recipes: [],
   loading: false,
+  lastFetched: null,
+  householdId: null,
 
-  fetchRecipes: async (householdId) => {
+  fetchRecipes: async (householdId, force = false) => {
+    const { lastFetched, householdId: cachedId } = get()
+    const now = Date.now()
+
+    // Cache: nicht neu laden wenn < 2 Minuten alt und gleicher Haushalt
+    if (
+      !force &&
+      lastFetched &&
+      cachedId === householdId &&
+      now - lastFetched < 2 * 60 * 1000
+    ) return
+
     set({ loading: true })
+
+    // Erst Basis-Daten laden (schnell)
     const { data, error } = await supabase
       .from('recipes')
-      .select('*, ingredients(*), recipe_steps(*)')
+      .select('id, name, category, tags, image_url, is_favorite, rating, servings, source_url, description, created_at')
       .eq('household_id', householdId)
       .order('name')
-    if (!error) set({ recipes: data || [] })
-    set({ loading: false })
+
+    if (!error) {
+      set({
+        recipes: data || [],
+        loading: false,
+        lastFetched: now,
+        householdId
+      })
+    } else {
+      set({ loading: false })
+    }
   },
+
+  // Einzelnes Rezept mit allen Details laden (nur bei Bedarf)
+  fetchRecipeDetails: async (id) => {
+    const existing = get().recipes.find(r => r.id === id)
+    if (existing?.ingredients) return // bereits geladen
+
+    const { data } = await supabase
+      .from('recipes')
+      .select('*, ingredients(*), recipe_steps(*)')
+      .eq('id', id)
+      .single()
+
+    if (data) {
+      set({
+        recipes: get().recipes.map(r => r.id === id ? data : r)
+      })
+    }
+  },
+
+  invalidateCache: () => set({ lastFetched: null }),
 
   addRecipe: async (recipeData, householdId) => {
     const { ingredients, recipe_steps, steps, ...recipe } = recipeData
@@ -55,7 +99,8 @@ export const useRecipeStore = create((set, get) => ({
     }
 
     toast.success('Rezept gespeichert')
-    await get().fetchRecipes(householdId)
+    get().invalidateCache()
+    await get().fetchRecipes(householdId, true)
     return newRecipe
   },
 
@@ -95,42 +140,39 @@ export const useRecipeStore = create((set, get) => ({
     }
 
     toast.success('Rezept aktualisiert')
-    await get().fetchRecipes(householdId)
+    get().invalidateCache()
+    await get().fetchRecipes(householdId, true)
   },
 
   toggleFavorite: async (id, householdId) => {
     const recipe = get().recipes.find(r => r.id === id)
     if (!recipe) return
     const newVal = !recipe.is_favorite
+    // Optimistic Update — sofort im UI ändern
+    set({ recipes: get().recipes.map(r => r.id === id ? { ...r, is_favorite: newVal } : r) })
     await supabase.from('recipes').update({ is_favorite: newVal }).eq('id', id)
-    set({
-      recipes: get().recipes.map(r =>
-        r.id === id ? { ...r, is_favorite: newVal } : r
-      )
-    })
     toast.success(newVal ? 'Zu Favoriten hinzugefügt' : 'Aus Favoriten entfernt')
   },
 
   setRating: async (id, rating) => {
     const current = get().recipes.find(r => r.id === id)
     const newRating = current?.rating === rating ? null : rating
+    // Optimistic Update
+    set({ recipes: get().recipes.map(r => r.id === id ? { ...r, rating: newRating } : r) })
     await supabase.from('recipes').update({ rating: newRating }).eq('id', id)
-    set({
-      recipes: get().recipes.map(r =>
-        r.id === id ? { ...r, rating: newRating } : r
-      )
-    })
     toast.success(newRating ? `Bewertet mit ${newRating} Sternen` : 'Bewertung entfernt')
   },
 
   deleteRecipe: async (id, householdId) => {
+    // Optimistic Update
+    set({ recipes: get().recipes.filter(r => r.id !== id) })
     const { error } = await supabase.from('recipes').delete().eq('id', id)
     if (error) {
       toast.error('Rezept konnte nicht gelöscht werden')
+      await get().fetchRecipes(householdId, true)
       throw error
     }
     toast.success('Rezept gelöscht')
-    await get().fetchRecipes(householdId)
   },
 
   uploadImage: async (file, userId) => {

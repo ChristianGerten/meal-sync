@@ -11,6 +11,7 @@ export const usePlanStore = create((set, get) => ({
   entries: [],
   currentWeekStart: getWeekStart(),
   loading: false,
+  planCache: {}, // weekStart → { plan, entries, fetchedAt }
 
   setWeek: (date) => {
     const weekStart = getWeekStart(date)
@@ -22,8 +23,22 @@ export const usePlanStore = create((set, get) => ({
   },
 
   fetchPlan: async (householdId, weekStart) => {
-    set({ loading: true })
     weekStart = weekStart || get().currentWeekStart
+    const cacheKey = `${householdId}_${weekStart}`
+    const cached = get().planCache[cacheKey]
+    const now = Date.now()
+
+    // Cache: 60 Sekunden gültig
+    if (cached && now - cached.fetchedAt < 60 * 1000) {
+      set({
+        currentPlan: cached.plan,
+        entries: cached.entries,
+        loading: false
+      })
+      return
+    }
+
+    set({ loading: true })
 
     let { data: plan } = await supabase
       .from('meal_plans')
@@ -46,7 +61,14 @@ export const usePlanStore = create((set, get) => ({
       .select('*, recipes(id, name, category, image_url, servings, ingredients(*))')
       .eq('plan_id', plan.id)
 
-    set({ currentPlan: plan, entries: entries || [], loading: false })
+    const result = { plan, entries: entries || [], fetchedAt: now }
+
+    set({
+      currentPlan: plan,
+      entries: entries || [],
+      loading: false,
+      planCache: { ...get().planCache, [cacheKey]: result }
+    })
   },
 
   addEntry: async (day, mealType, recipeId, recipeName, servings = 2) => {
@@ -72,30 +94,45 @@ export const usePlanStore = create((set, get) => ({
       .select('*, recipes(id, name, category, image_url, servings, ingredients(*))')
       .single()
 
-    set({
-      entries: [
-        ...get().entries.filter(e => e.id !== existing?.id),
-        entry
-      ]
-    })
+    const newEntries = [
+      ...get().entries.filter(e => e.id !== existing?.id),
+      entry
+    ]
+    set({ entries: newEntries })
+    get()._updatePlanCache(newEntries)
   },
 
   updateServings: async (entryId, servings) => {
-    await supabase
-      .from('meal_plan_entries')
-      .update({ servings })
-      .eq('id', entryId)
-
-    set({
-      entries: get().entries.map(e =>
-        e.id === entryId ? { ...e, servings } : e
-      )
-    })
+    // Optimistic Update
+    const newEntries = get().entries.map(e =>
+      e.id === entryId ? { ...e, servings } : e
+    )
+    set({ entries: newEntries })
+    get()._updatePlanCache(newEntries)
+    await supabase.from('meal_plan_entries').update({ servings }).eq('id', entryId)
   },
 
   removeEntry: async (entryId) => {
+    // Optimistic Update
+    const newEntries = get().entries.filter(e => e.id !== entryId)
+    set({ entries: newEntries })
+    get()._updatePlanCache(newEntries)
     await supabase.from('meal_plan_entries').delete().eq('id', entryId)
-    set({ entries: get().entries.filter(e => e.id !== entryId) })
+  },
+
+  _updatePlanCache: (entries) => {
+    const { currentPlan, currentWeekStart, planCache } = get()
+    if (!currentPlan) return
+    const cacheKey = `${currentPlan.household_id}_${currentWeekStart}`
+    const cached = planCache[cacheKey]
+    if (cached) {
+      set({
+        planCache: {
+          ...planCache,
+          [cacheKey]: { ...cached, entries }
+        }
+      })
+    }
   },
 
   refreshEntries: async () => {
@@ -105,6 +142,8 @@ export const usePlanStore = create((set, get) => ({
       .from('meal_plan_entries')
       .select('*, recipes(id, name, category, image_url, servings, ingredients(*))')
       .eq('plan_id', currentPlan.id)
-    set({ entries: data || [] })
+    const entries = data || []
+    set({ entries })
+    get()._updatePlanCache(entries)
   }
 }))
