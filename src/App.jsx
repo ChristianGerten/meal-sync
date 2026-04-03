@@ -2,19 +2,19 @@ import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/useAuthStore'
 import { useRealtime } from './hooks/useRealtime'
+import { ToastContainer } from './components/Toast'
 import Login from './pages/Login'
 import Recipes from './pages/Recipes'
 import RecipeDetail from './pages/RecipeDetail'
 import WeekPlanner from './pages/WeekPlanner'
 import ShoppingList from './pages/ShoppingList'
 import CookingMode from './pages/CookingMode'
-import Layout from './components/layout/Layout'
 import History from './pages/History'
+import Layout from './components/layout/Layout'
 
 function AppRoutes() {
   const { user, household } = useAuthStore()
   useRealtime(household?.id)
-
 
   if (!user) return <Navigate to="/login" replace />
 
@@ -65,6 +65,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <ToastContainer />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/*" element={<AppRoutes />} />

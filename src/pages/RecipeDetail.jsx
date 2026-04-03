@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save, Trash2, Plus, X, Camera, ChefHat } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, Plus, X, Camera, ChefHat, Edit2 } from 'lucide-react'
 import { useRecipeStore } from '../store/useRecipeStore'
 import { useAuthStore } from '../store/useAuthStore'
+import { toast } from '../components/Toast'
 
 const UNITS = ['g', 'kg', 'ml', 'l', 'EL', 'TL', 'Stück', 'Prise', 'Bund', 'Dose', 'Packung']
 
@@ -41,128 +42,9 @@ const parseIngredientLine = (line) => {
   return { name: clean, amount: null, unit: '', category: 'Sonstiges' }
 }
 
-export default function RecipeDetail() {
-  const { id } = useParams()
-  const isNew = id === 'new'
-  const navigate = useNavigate()
-  const household = useAuthStore(s => s.household)
-  const user = useAuthStore(s => s.user)
-  const { recipes, addRecipe, updateRecipe, deleteRecipe, uploadImage } = useRecipeStore()
-
-  const existing = recipes.find(r => r.id === id)
-
-  const [form, setForm] = useState({
-    name: '', category: '', description: '',
-    servings: 2, tags: [], image_url: '', source_url: ''
-  })
-  const [ingredients, setIngredients] = useState([emptyIngredient()])
-  const [steps, setSteps] = useState([''])
-  const [quickInput, setQuickInput] = useState('')
-  const [quickMode, setQuickMode] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    if (existing) {
-      setForm({
-        name: existing.name || '',
-        category: existing.category || '',
-        description: existing.description || '',
-        servings: existing.servings || 2,
-        tags: existing.tags || [],
-        image_url: existing.image_url || '',
-        source_url: existing.source_url || ''
-      })
-      setIngredients(
-        existing.ingredients?.length ? existing.ingredients : [emptyIngredient()]
-      )
-      const sorted = [...(existing.recipe_steps || [])]
-        .sort((a, b) => a.step_number - b.step_number)
-      setSteps(sorted.length ? sorted.map(s => s.description) : [''])
-    }
-  }, [existing])
-
-  const handleSave = async () => {
-    if (!form.name.trim()) return alert('Name ist Pflichtfeld')
-    setSaving(true)
-    try {
-      const data = {
-        ...form,
-        ingredients: ingredients.filter(i => i.name.trim()),
-        steps: steps
-          .filter(s => s.trim())
-          .map((s, i) => ({ step_number: i + 1, description: s }))
-      }
-      if (isNew) await addRecipe(data, household.id)
-      else await updateRecipe(id, data, household.id)
-      navigate('/recipes')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!confirm('Rezept wirklich löschen?')) return
-    await deleteRecipe(id, household.id)
-    navigate('/recipes')
-  }
-
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    setUploading(true)
-    try {
-      const url = await uploadImage(file, user.id)
-      setForm(f => ({ ...f, image_url: url }))
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const handleQuickInput = () => {
-    const lines = quickInput.split('\n').filter(l => l.trim())
-    const parsed = lines.map(parseIngredientLine).filter(Boolean)
-    if (parsed.length) {
-      setIngredients(prev => {
-        const filtered = prev.filter(i => i.name.trim())
-        return [...filtered, ...parsed]
-      })
-      setQuickInput('')
-      setQuickMode(false)
-    }
-  }
-
-  const toggleTag = (tag) => {
-    setForm(f => ({
-      ...f,
-      tags: f.tags.includes(tag)
-        ? f.tags.filter(t => t !== tag)
-        : [...f.tags, tag]
-    }))
-  }
-
-  const updateIng = (i, field, val) => {
-    const copy = [...ingredients]
-    copy[i] = { ...copy[i], [field]: val }
-    setIngredients(copy)
-  }
-
-  const updateStep = (i, val) => {
-    const copy = [...steps]
-    copy[i] = val
-    setSteps(copy)
-  }
-
-  const inputStyle = {
-    background: 'var(--color-surface)',
-    border: '0.5px solid var(--color-border)',
-    borderRadius: '10px',
-    color: 'var(--color-text)',
-    outline: 'none',
-    fontSize: '13px',
-    padding: '9px 12px',
-    boxSizing: 'border-box'
-  }
+// ── Ansicht-Modus ────────────────────────────────────────────
+function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
+  const steps = [...(recipe.recipe_steps || [])].sort((a, b) => a.step_number - b.step_number)
 
   return (
     <div style={{paddingBottom: '80px'}}>
@@ -176,60 +58,340 @@ export default function RecipeDetail() {
         display: 'flex', alignItems: 'center', gap: '12px'
       }}>
         <button onClick={() => navigate(-1)} style={{
-          background: 'none', border: 'none',
-          cursor: 'pointer', color: 'var(--color-text-muted)',
-          display: 'flex', alignItems: 'center', padding: '4px'
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center'
         }}>
           <ArrowLeft size={20} />
         </button>
-
         <span style={{
-          fontWeight: '500', fontSize: '16px',
-          color: 'var(--color-text)', flex: 1,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+          fontWeight: '600', fontSize: '16px', color: 'var(--color-text)',
+          flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
         }}>
-          {isNew ? 'Neues Rezept' : (form.name || 'Rezept bearbeiten')}
+          {recipe.name}
         </span>
-
-        <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
-          {!isNew && (
-            <button onClick={handleDelete} style={{
-              background: 'none', border: 'none',
-              cursor: 'pointer', padding: '4px',
-              color: '#e53e3e',
-              display: 'flex', alignItems: 'center'
-            }}>
-              <Trash2 size={18} />
-            </button>
-          )}
-          <button onClick={handleSave} disabled={saving} style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            padding: '8px 14px', background: '#6c63ff', color: '#fff',
-            border: 'none', borderRadius: '10px',
-            cursor: saving ? 'not-allowed' : 'pointer',
-            fontSize: '13px', fontWeight: '500',
-            opacity: saving ? 0.7 : 1
-          }}>
-            <Save size={14} />
-            {saving ? '...' : 'Speichern'}
-          </button>
-        </div>
+        <button onClick={onDelete} style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: '#e53e3e', display: 'flex', alignItems: 'center', padding: '4px'
+        }}>
+          <Trash2 size={18} />
+        </button>
+        <button onClick={onEdit} style={{
+          display: 'flex', alignItems: 'center', gap: '6px',
+          padding: '8px 14px', background: 'var(--color-surface-2)',
+          border: '0.5px solid var(--color-border)',
+          borderRadius: '10px', cursor: 'pointer',
+          fontSize: '13px', color: 'var(--color-text-muted)'
+        }}>
+          <Edit2 size={14} /> Bearbeiten
+        </button>
       </div>
 
-      <div style={{padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px'}}>
+      <div style={{padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px'}}>
 
         {/* Kochen Button */}
-        {!isNew && existing?.recipe_steps?.length > 0 && (
-          <button onClick={() => navigate(`/cook/${id}`)} style={{
-            width: '100%', padding: '13px',
-            background: '#6c63ff',
-            color: '#fff', border: 'none', borderRadius: '12px',
-            cursor: 'pointer', fontSize: '15px', fontWeight: '500',
+        {steps.length > 0 && (
+          <button onClick={onCook} style={{
+            width: '100%', padding: '14px',
+            background: 'var(--color-accent)', color: '#fff',
+            border: 'none', borderRadius: '14px', cursor: 'pointer',
+            fontSize: '15px', fontWeight: '600',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
           }}>
             <ChefHat size={18} /> Jetzt kochen
           </button>
         )}
+
+        {/* Bild */}
+        {recipe.image_url && (
+          <img src={recipe.image_url} alt={recipe.name} style={{
+            width: '100%', height: '200px', objectFit: 'cover',
+            borderRadius: '16px', border: '0.5px solid var(--color-border)'
+          }} />
+        )}
+
+        {/* Basis-Info */}
+        <div style={{
+          background: 'var(--color-surface)',
+          borderRadius: '16px', padding: '16px',
+          border: '0.5px solid var(--color-border)',
+          display: 'flex', flexDirection: 'column', gap: '10px'
+        }}>
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: '8px'
+          }}>
+            {recipe.category && (
+              <span style={{
+                fontSize: '13px', padding: '4px 12px',
+                background: 'var(--color-accent-soft)',
+                color: 'var(--color-accent-text)',
+                borderRadius: '20px', fontWeight: '500'
+              }}>
+                {recipe.category}
+              </span>
+            )}
+            {recipe.servings && (
+              <span style={{
+                fontSize: '13px', padding: '4px 12px',
+                background: 'var(--color-surface-2)',
+                color: 'var(--color-text-muted)',
+                borderRadius: '20px'
+              }}>
+                {recipe.servings} Portionen
+              </span>
+            )}
+            {recipe.rating && (
+              <span style={{
+                fontSize: '13px', padding: '4px 12px',
+                background: '#fef3c7', color: '#d97706',
+                borderRadius: '20px', fontWeight: '500'
+              }}>
+                {'⭐'.repeat(recipe.rating)}
+              </span>
+            )}
+          </div>
+
+          {recipe.tags?.length > 0 && (
+            <div style={{display: 'flex', flexWrap: 'wrap', gap: '5px'}}>
+              {recipe.tags.map(tag => (
+                <span key={tag} style={{
+                  fontSize: '12px', padding: '3px 8px',
+                  background: 'var(--color-surface-2)',
+                  color: 'var(--color-text-muted)',
+                  borderRadius: '20px',
+                  border: '0.5px solid var(--color-border)'
+                }}>
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {recipe.description && (
+            <p style={{
+              fontSize: '14px', color: 'var(--color-text)',
+              lineHeight: '1.6', margin: 0
+            }}>
+              {recipe.description}
+            </p>
+          )}
+        </div>
+
+        {/* Zutaten */}
+        {recipe.ingredients?.length > 0 && (
+          <div style={{
+            background: 'var(--color-surface)',
+            borderRadius: '16px', padding: '16px',
+            border: '0.5px solid var(--color-border)'
+          }}>
+            <div style={{
+              fontSize: '12px', fontWeight: '700',
+              color: 'var(--color-text-muted)',
+              textTransform: 'uppercase', letterSpacing: '0.5px',
+              marginBottom: '12px'
+            }}>
+              Zutaten · {recipe.servings} Portionen
+            </div>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
+              {recipe.ingredients.map((ing, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 10px',
+                  background: 'var(--color-surface-2)',
+                  borderRadius: '8px'
+                }}>
+                  <span style={{fontSize: '14px', color: 'var(--color-text)'}}>
+                    {ing.name}
+                  </span>
+                  {(ing.amount || ing.unit) && (
+                    <span style={{
+                      fontSize: '14px', fontWeight: '700',
+                      color: 'var(--color-text)', marginLeft: '8px'
+                    }}>
+                      {ing.amount && `${Number(ing.amount) % 1 === 0 ? Number(ing.amount) : Number(ing.amount).toFixed(1)}`}
+                      {ing.unit && ` ${ing.unit}`}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Zubereitungsschritte */}
+        {steps.length > 0 && (
+          <div style={{
+            background: 'var(--color-surface)',
+            borderRadius: '16px', padding: '16px',
+            border: '0.5px solid var(--color-border)'
+          }}>
+            <div style={{
+              fontSize: '12px', fontWeight: '700',
+              color: 'var(--color-text-muted)',
+              textTransform: 'uppercase', letterSpacing: '0.5px',
+              marginBottom: '12px',
+              display: 'flex', alignItems: 'center', gap: '6px'
+            }}>
+              <ChefHat size={13} /> Zubereitung
+            </div>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
+              {steps.map((step, i) => (
+                <div key={i} style={{
+                  display: 'flex', gap: '12px', alignItems: 'flex-start'
+                }}>
+                  <div style={{
+                    width: '26px', height: '26px', borderRadius: '50%',
+                    background: 'var(--color-accent)', color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '12px', fontWeight: '700', flexShrink: 0, marginTop: '1px'
+                  }}>
+                    {i + 1}
+                  </div>
+                  <p style={{
+                    fontSize: '14px', color: 'var(--color-text)',
+                    lineHeight: '1.6', margin: 0, flex: 1
+                  }}>
+                    {step.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {recipe.source_url && (
+          <a href={recipe.source_url} target="_blank" rel="noopener noreferrer" style={{
+            display: 'block', padding: '10px 14px',
+            background: 'var(--color-surface)',
+            border: '0.5px solid var(--color-border)',
+            borderRadius: '12px', fontSize: '13px',
+            color: 'var(--color-accent)', textDecoration: 'none'
+          }}>
+            🔗 Originalrezept öffnen
+          </a>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Bearbeiten-Modus ─────────────────────────────────────────
+function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadImage }) {
+  const [form, setForm] = useState({
+    name: recipe?.name || '',
+    category: recipe?.category || '',
+    description: recipe?.description || '',
+    servings: recipe?.servings || 2,
+    tags: recipe?.tags || [],
+    image_url: recipe?.image_url || '',
+    source_url: recipe?.source_url || ''
+  })
+  const [ingredients, setIngredients] = useState(
+    recipe?.ingredients?.length ? recipe.ingredients : [emptyIngredient()]
+  )
+  const [steps, setSteps] = useState(() => {
+    const sorted = [...(recipe?.recipe_steps || [])].sort((a, b) => a.step_number - b.step_number)
+    return sorted.length ? sorted.map(s => s.description) : ['']
+  })
+  const [quickInput, setQuickInput] = useState('')
+  const [quickMode, setQuickMode] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!form.name.trim()) {
+      toast.error('Name ist Pflichtfeld')
+      return
+    }
+    setSaving(true)
+    try {
+      await onSave({
+        ...form,
+        ingredients: ingredients.filter(i => i.name.trim()),
+        steps: steps.filter(s => s.trim()).map((s, i) => ({
+          step_number: i + 1, description: s
+        }))
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const url = await uploadImage(file, user.id)
+      setForm(f => ({ ...f, image_url: url }))
+    } finally { setUploading(false) }
+  }
+
+  const handleQuickInput = () => {
+    const lines = quickInput.split('\n').filter(l => l.trim())
+    const parsed = lines.map(parseIngredientLine).filter(Boolean)
+    if (parsed.length) {
+      setIngredients(prev => [...prev.filter(i => i.name.trim()), ...parsed])
+      setQuickInput('')
+      setQuickMode(false)
+    }
+  }
+
+  const toggleTag = (tag) => {
+    setForm(f => ({
+      ...f,
+      tags: f.tags.includes(tag) ? f.tags.filter(t => t !== tag) : [...f.tags, tag]
+    }))
+  }
+
+  const updateIng = (i, field, val) => {
+    const copy = [...ingredients]
+    copy[i] = { ...copy[i], [field]: val }
+    setIngredients(copy)
+  }
+
+  const inputStyle = {
+    background: 'var(--color-surface)',
+    border: '0.5px solid var(--color-border)',
+    borderRadius: '10px', color: 'var(--color-text)',
+    outline: 'none', fontSize: '13px',
+    padding: '9px 12px', boxSizing: 'border-box'
+  }
+
+  return (
+    <div style={{paddingBottom: '80px'}}>
+
+      {/* Header */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 10,
+        background: 'var(--color-surface)',
+        borderBottom: '0.5px solid var(--color-border)',
+        padding: '12px 16px',
+        display: 'flex', alignItems: 'center', gap: '12px'
+      }}>
+        <button onClick={onCancel} style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center'
+        }}>
+          <ArrowLeft size={20} />
+        </button>
+        <span style={{
+          fontWeight: '600', fontSize: '16px', color: 'var(--color-text)', flex: 1
+        }}>
+          {isNew ? 'Neues Rezept' : 'Bearbeiten'}
+        </span>
+        <button onClick={handleSave} disabled={saving} style={{
+          display: 'flex', alignItems: 'center', gap: '6px',
+          padding: '8px 14px', background: 'var(--color-accent)', color: '#fff',
+          border: 'none', borderRadius: '10px',
+          cursor: saving ? 'not-allowed' : 'pointer',
+          fontSize: '13px', fontWeight: '500', opacity: saving ? 0.7 : 1
+        }}>
+          <Save size={14} /> {saving ? '...' : 'Speichern'}
+        </button>
+      </div>
+
+      <div style={{padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px'}}>
 
         {/* Bild */}
         <label style={{cursor: 'pointer', display: 'block'}}>
@@ -242,10 +404,7 @@ export default function RecipeDetail() {
           }}>
             {form.image_url ? (
               <>
-                <img
-                  src={form.image_url} alt=""
-                  style={{width: '100%', height: '100%', objectFit: 'cover'}}
-                />
+                <img src={form.image_url} alt="" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
                 <div style={{
                   position: 'absolute', bottom: '8px', right: '8px',
                   background: 'rgba(0,0,0,0.5)', borderRadius: '8px',
@@ -263,11 +422,7 @@ export default function RecipeDetail() {
               </div>
             )}
           </div>
-          <input
-            type="file" accept="image/*"
-            onChange={handleImageUpload}
-            style={{display: 'none'}}
-          />
+          <input type="file" accept="image/*" onChange={handleImageUpload} style={{display: 'none'}} />
         </label>
 
         {/* Name */}
@@ -275,73 +430,43 @@ export default function RecipeDetail() {
           value={form.name}
           onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
           placeholder="Rezeptname *"
-          style={{
-            ...inputStyle,
-            fontSize: '16px', fontWeight: '500',
-            padding: '13px 16px', borderRadius: '12px'
-          }}
+          style={{...inputStyle, fontSize: '16px', fontWeight: '500', padding: '13px 16px', borderRadius: '12px'}}
         />
 
         {/* Portionen */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '12px',
-          background: 'var(--color-surface)',
-          border: '0.5px solid var(--color-border)',
+          background: 'var(--color-surface)', border: '0.5px solid var(--color-border)',
           borderRadius: '12px', padding: '10px 16px'
         }}>
-          <span style={{fontSize: '13px', color: 'var(--color-text-muted)', flex: 1}}>
-            Portionen
-          </span>
-          <button
-            onClick={() => setForm(f => ({ ...f, servings: Math.max(1, f.servings - 1) }))}
-            style={{
-              width: '30px', height: '30px', borderRadius: '8px',
-              background: 'var(--color-surface-2)',
-              border: '0.5px solid var(--color-border)',
-              cursor: 'pointer', fontSize: '18px', color: 'var(--color-text)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}
-          >−</button>
-          <span style={{
-            fontSize: '16px', fontWeight: '500',
-            color: 'var(--color-text)', minWidth: '24px', textAlign: 'center'
-          }}>
+          <span style={{fontSize: '13px', color: 'var(--color-text-muted)', flex: 1}}>Portionen</span>
+          <button onClick={() => setForm(f => ({ ...f, servings: Math.max(1, f.servings - 1) }))} style={{
+            width: '30px', height: '30px', borderRadius: '8px',
+            background: 'var(--color-surface-2)', border: '0.5px solid var(--color-border)',
+            cursor: 'pointer', fontSize: '18px', color: 'var(--color-text)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>−</button>
+          <span style={{fontSize: '16px', fontWeight: '600', color: 'var(--color-text)', minWidth: '24px', textAlign: 'center'}}>
             {form.servings}
           </span>
-          <button
-            onClick={() => setForm(f => ({ ...f, servings: f.servings + 1 }))}
-            style={{
-              width: '30px', height: '30px', borderRadius: '8px',
-              background: 'var(--color-surface-2)',
-              border: '0.5px solid var(--color-border)',
-              cursor: 'pointer', fontSize: '18px', color: 'var(--color-text)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}
-          >+</button>
+          <button onClick={() => setForm(f => ({ ...f, servings: f.servings + 1 }))} style={{
+            width: '30px', height: '30px', borderRadius: '8px',
+            background: 'var(--color-surface-2)', border: '0.5px solid var(--color-border)',
+            cursor: 'pointer', fontSize: '18px', color: 'var(--color-text)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>+</button>
         </div>
 
-        {/* Kategorie Chips */}
+        {/* Kategorie */}
         <div>
-          <div style={{
-            fontSize: '12px', fontWeight: '500',
-            color: 'var(--color-text-muted)', marginBottom: '8px',
-            textTransform: 'uppercase', letterSpacing: '0.5px'
-          }}>
-            Kategorie
-          </div>
+          <div style={{fontSize: '12px', fontWeight: '600', color: 'var(--color-text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px'}}>Kategorie</div>
           <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
             {CATEGORIES.map(cat => (
-              <button key={cat} onClick={() => setForm(f => ({
-                ...f, category: f.category === cat ? '' : cat
-              }))} style={{
-                padding: '7px 14px', borderRadius: '20px',
-                cursor: 'pointer', fontSize: '12px',
-                fontWeight: form.category === cat ? '500' : '400',
-                background: form.category === cat ? '#6c63ff' : 'var(--color-surface)',
+              <button key={cat} onClick={() => setForm(f => ({ ...f, category: f.category === cat ? '' : cat }))} style={{
+                padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px',
+                background: form.category === cat ? 'var(--color-accent)' : 'var(--color-surface)',
                 color: form.category === cat ? '#fff' : 'var(--color-text-muted)',
-                border: form.category === cat
-                  ? '2px solid #6c63ff'
-                  : '0.5px solid var(--color-border)',
+                border: form.category === cat ? '2px solid var(--color-accent)' : '0.5px solid var(--color-border)',
                 transition: 'all 0.15s'
               }}>
                 {cat}
@@ -350,29 +475,16 @@ export default function RecipeDetail() {
           </div>
         </div>
 
-        {/* Tags Chips */}
+        {/* Tags */}
         <div>
-          <div style={{
-            fontSize: '12px', fontWeight: '500',
-            color: 'var(--color-text-muted)', marginBottom: '8px',
-            textTransform: 'uppercase', letterSpacing: '0.5px'
-          }}>
-            Tags
-          </div>
+          <div style={{fontSize: '12px', fontWeight: '600', color: 'var(--color-text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px'}}>Tags</div>
           <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
             {TAGS.map(tag => (
               <button key={tag} onClick={() => toggleTag(tag)} style={{
-                padding: '7px 14px', borderRadius: '20px',
-                cursor: 'pointer', fontSize: '12px',
-                background: form.tags.includes(tag)
-                  ? 'var(--color-accent-soft)'
-                  : 'var(--color-surface)',
-                color: form.tags.includes(tag)
-                  ? 'var(--color-accent-text)'
-                  : 'var(--color-text-muted)',
-                border: form.tags.includes(tag)
-                  ? '1.5px solid #6c63ff'
-                  : '0.5px solid var(--color-border)',
+                padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px',
+                background: form.tags.includes(tag) ? 'var(--color-accent-soft)' : 'var(--color-surface)',
+                color: form.tags.includes(tag) ? 'var(--color-accent-text)' : 'var(--color-text-muted)',
+                border: form.tags.includes(tag) ? '1.5px solid var(--color-accent)' : '0.5px solid var(--color-border)',
                 transition: 'all 0.15s'
               }}>
                 {tag}
@@ -381,245 +493,172 @@ export default function RecipeDetail() {
           </div>
         </div>
 
-        {/* Trennlinie */}
         <div style={{height: '0.5px', background: 'var(--color-border)'}} />
 
         {/* Zutaten */}
         <div>
-          <div style={{
-            display: 'flex', alignItems: 'center',
-            justifyContent: 'space-between', marginBottom: '10px'
-          }}>
-            <span style={{fontSize: '14px', fontWeight: '500', color: 'var(--color-text)'}}>
-              Zutaten
-            </span>
+          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px'}}>
+            <span style={{fontSize: '14px', fontWeight: '600', color: 'var(--color-text)'}}>Zutaten</span>
             <button onClick={() => setQuickMode(q => !q)} style={{
               fontSize: '11px', padding: '5px 10px',
               background: quickMode ? 'var(--color-accent-soft)' : 'var(--color-surface-2)',
               color: quickMode ? 'var(--color-accent-text)' : 'var(--color-text-muted)',
-              border: '0.5px solid var(--color-border)',
-              borderRadius: '20px', cursor: 'pointer'
+              border: '0.5px solid var(--color-border)', borderRadius: '20px', cursor: 'pointer'
             }}>
               ⚡ Schnelleingabe
             </button>
           </div>
 
-          {/* Schnelleingabe Box */}
           {quickMode && (
-            <div style={{
-              background: 'var(--color-accent-soft)',
-              borderRadius: '12px', padding: '12px',
-              marginBottom: '12px',
-              border: '0.5px solid var(--color-border)'
-            }}>
-              <p style={{
-                fontSize: '11px', color: 'var(--color-accent-text)',
-                marginBottom: '8px', lineHeight: '1.5'
-              }}>
+            <div style={{background: 'var(--color-accent-soft)', borderRadius: '12px', padding: '12px', marginBottom: '12px', border: '0.5px solid var(--color-border)'}}>
+              <p style={{fontSize: '11px', color: 'var(--color-accent-text)', marginBottom: '8px', lineHeight: '1.5'}}>
                 Eine Zutat pro Zeile — z.B. "200g Spaghetti", "3 Eier", "Salz"
               </p>
               <textarea
-                value={quickInput}
-                onChange={e => setQuickInput(e.target.value)}
-                placeholder={'200g Spaghetti\n3 Eier\n100g Speck\nSalz\n1 Zwiebel'}
-                rows={5}
-                style={{
-                  width: '100%', padding: '10px',
-                  background: 'var(--color-surface)',
-                  border: '0.5px solid var(--color-border)',
-                  borderRadius: '8px', fontSize: '13px',
-                  color: 'var(--color-text)', outline: 'none',
-                  resize: 'none', boxSizing: 'border-box',
-                  fontFamily: 'monospace', lineHeight: '1.6'
-                }}
+                value={quickInput} onChange={e => setQuickInput(e.target.value)}
+                placeholder={'200g Spaghetti\n3 Eier\n100g Speck'} rows={4}
+                style={{width: '100%', padding: '10px', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: '8px', fontSize: '13px', color: 'var(--color-text)', outline: 'none', resize: 'none', boxSizing: 'border-box', fontFamily: 'monospace'}}
               />
               <div style={{display: 'flex', gap: '8px', marginTop: '8px'}}>
-                <button onClick={handleQuickInput} style={{
-                  flex: 1, padding: '10px',
-                  background: '#6c63ff', color: '#fff',
-                  border: 'none', borderRadius: '8px',
-                  cursor: 'pointer', fontSize: '13px', fontWeight: '500'
-                }}>
-                  Übernehmen
-                </button>
-                <button onClick={() => { setQuickMode(false); setQuickInput('') }} style={{
-                  padding: '10px 14px',
-                  background: 'var(--color-surface)',
-                  border: '0.5px solid var(--color-border)',
-                  borderRadius: '8px', cursor: 'pointer',
-                  fontSize: '13px', color: 'var(--color-text-muted)'
-                }}>
-                  Abbrechen
-                </button>
+                <button onClick={handleQuickInput} style={{flex: 1, padding: '10px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '500'}}>Übernehmen</button>
+                <button onClick={() => { setQuickMode(false); setQuickInput('') }} style={{padding: '10px 14px', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--color-text-muted)'}}>Abbrechen</button>
               </div>
             </div>
           )}
 
-          {/* Zutaten Liste */}
           <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
             {ingredients.map((ing, i) => (
               <div key={i} style={{display: 'flex', gap: '5px', alignItems: 'center'}}>
-                <input
-                  value={ing.amount || ''}
-                  onChange={e => updateIng(i, 'amount', e.target.value)}
-                  placeholder="Menge"
-                  type="number"
-                  style={{...inputStyle, width: '58px', padding: '9px 6px', textAlign: 'center'}}
-                />
-                <select
-                  value={ing.unit || ''}
-                  onChange={e => updateIng(i, 'unit', e.target.value)}
-                  style={{...inputStyle, width: '68px', padding: '9px 4px'}}
-                >
+                <input value={ing.amount || ''} onChange={e => updateIng(i, 'amount', e.target.value)} placeholder="Menge" type="number" style={{...inputStyle, width: '58px', padding: '9px 6px', textAlign: 'center'}} />
+                <select value={ing.unit || ''} onChange={e => updateIng(i, 'unit', e.target.value)} style={{...inputStyle, width: '68px', padding: '9px 4px'}}>
                   <option value="">—</option>
                   {UNITS.map(u => <option key={u}>{u}</option>)}
                 </select>
-                <input
-                  value={ing.name}
-                  onChange={e => updateIng(i, 'name', e.target.value)}
-                  placeholder="Zutat *"
-                  style={{...inputStyle, flex: 1}}
-                />
-                <select
-                  value={ing.category || 'Sonstiges'}
-                  onChange={e => updateIng(i, 'category', e.target.value)}
-                  style={{...inputStyle, width: '88px', padding: '9px 4px', fontSize: '11px'}}
-                >
+                <input value={ing.name} onChange={e => updateIng(i, 'name', e.target.value)} placeholder="Zutat *" style={{...inputStyle, flex: 1}} />
+                <select value={ing.category || 'Sonstiges'} onChange={e => updateIng(i, 'category', e.target.value)} style={{...inputStyle, width: '88px', padding: '9px 4px', fontSize: '11px'}}>
                   {CATEGORIES_ING.map(c => <option key={c}>{c}</option>)}
                 </select>
-                <button
-                  onClick={() => setIngredients(ingredients.filter((_, j) => j !== i))}
-                  style={{
-                    background: 'none', border: 'none',
-                    cursor: 'pointer', padding: '6px',
-                    color: 'var(--color-text-muted)',
-                    display: 'flex', alignItems: 'center'
-                  }}
-                >
+                <button onClick={() => setIngredients(ingredients.filter((_, j) => j !== i))} style={{background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center'}}>
                   <X size={15} />
                 </button>
               </div>
             ))}
           </div>
-
-          <button
-            onClick={() => setIngredients([...ingredients, emptyIngredient()])}
-            style={{
-              marginTop: '10px',
-              display: 'flex', alignItems: 'center', gap: '5px',
-              background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: '13px', color: '#6c63ff', padding: '4px 0'
-            }}
-          >
+          <button onClick={() => setIngredients([...ingredients, emptyIngredient()])} style={{marginTop: '10px', display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--color-accent)', padding: '4px 0'}}>
             <Plus size={14} /> Zutat hinzufügen
           </button>
         </div>
 
-        {/* Trennlinie */}
         <div style={{height: '0.5px', background: 'var(--color-border)'}} />
 
         {/* Zubereitungsschritte */}
         <div>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'
-          }}>
-            <ChefHat size={16} color="#6c63ff" />
-            <span style={{fontSize: '14px', fontWeight: '500', color: 'var(--color-text)'}}>
-              Zubereitungsschritte
-            </span>
+          <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'}}>
+            <ChefHat size={16} color="var(--color-accent)" />
+            <span style={{fontSize: '14px', fontWeight: '600', color: 'var(--color-text)'}}>Zubereitungsschritte</span>
           </div>
-
           <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
             {steps.map((step, i) => (
               <div key={i} style={{display: 'flex', gap: '10px', alignItems: 'flex-start'}}>
                 <div style={{
                   width: '28px', height: '28px', borderRadius: '50%',
-                  background: step.trim() ? '#6c63ff' : 'var(--color-surface-2)',
+                  background: step.trim() ? 'var(--color-accent)' : 'var(--color-surface-2)',
                   border: step.trim() ? 'none' : '0.5px solid var(--color-border)',
                   color: step.trim() ? '#fff' : 'var(--color-text-muted)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '12px', fontWeight: '500',
-                  flexShrink: 0, marginTop: '9px',
-                  transition: 'background 0.2s'
+                  fontSize: '12px', fontWeight: '600', flexShrink: 0, marginTop: '9px', transition: 'background 0.2s'
                 }}>
                   {i + 1}
                 </div>
                 <textarea
-                  value={step}
-                  onChange={e => updateStep(i, e.target.value)}
-                  placeholder={`Schritt ${i + 1}…`}
-                  rows={2}
-                  style={{
-                    flex: 1, padding: '10px 12px',
-                    background: 'var(--color-surface)',
-                    border: '0.5px solid var(--color-border)',
-                    borderRadius: '10px', fontSize: '13px',
-                    color: 'var(--color-text)', outline: 'none',
-                    resize: 'none', lineHeight: '1.5',
-                    boxSizing: 'border-box'
-                  }}
+                  value={step} onChange={e => { const copy = [...steps]; copy[i] = e.target.value; setSteps(copy) }}
+                  placeholder={`Schritt ${i + 1}…`} rows={2}
+                  style={{flex: 1, padding: '10px 12px', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: '10px', fontSize: '13px', color: 'var(--color-text)', outline: 'none', resize: 'none', lineHeight: '1.5', boxSizing: 'border-box'}}
                 />
                 {steps.length > 1 && (
-                  <button
-                    onClick={() => setSteps(steps.filter((_, j) => j !== i))}
-                    style={{
-                      background: 'none', border: 'none',
-                      cursor: 'pointer', padding: '6px',
-                      color: 'var(--color-text-muted)',
-                      marginTop: '6px',
-                      display: 'flex', alignItems: 'center'
-                    }}
-                  >
+                  <button onClick={() => setSteps(steps.filter((_, j) => j !== i))} style={{background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--color-text-muted)', marginTop: '6px', display: 'flex', alignItems: 'center'}}>
                     <X size={15} />
                   </button>
                 )}
               </div>
             ))}
           </div>
-
-          <button
-            onClick={() => setSteps([...steps, ''])}
-            style={{
-              marginTop: '10px',
-              display: 'flex', alignItems: 'center', gap: '5px',
-              background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: '13px', color: '#6c63ff', padding: '4px 0'
-            }}
-          >
+          <button onClick={() => setSteps([...steps, ''])} style={{marginTop: '10px', display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--color-accent)', padding: '4px 0'}}>
             <Plus size={14} /> Schritt hinzufügen
           </button>
         </div>
 
-        {/* Trennlinie */}
         <div style={{height: '0.5px', background: 'var(--color-border)'}} />
 
         {/* Notizen */}
         <div>
-          <div style={{
-            fontSize: '12px', fontWeight: '500',
-            color: 'var(--color-text-muted)', marginBottom: '8px',
-            textTransform: 'uppercase', letterSpacing: '0.5px'
-          }}>
-            Notizen & Tipps
-          </div>
+          <div style={{fontSize: '12px', fontWeight: '600', color: 'var(--color-text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px'}}>Notizen & Tipps</div>
           <textarea
-            value={form.description}
-            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-            placeholder="Variationen, Tipps, Hinweise..."
-            rows={3}
-            style={{
-              width: '100%', padding: '12px 14px',
-              background: 'var(--color-surface)',
-              border: '0.5px solid var(--color-border)',
-              borderRadius: '12px', fontSize: '13px',
-              color: 'var(--color-text)', outline: 'none',
-              resize: 'none', boxSizing: 'border-box',
-              lineHeight: '1.5'
-            }}
+            value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+            placeholder="Variationen, Tipps, Hinweise..." rows={3}
+            style={{width: '100%', padding: '12px 14px', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: '12px', fontSize: '13px', color: 'var(--color-text)', outline: 'none', resize: 'none', boxSizing: 'border-box', lineHeight: '1.5'}}
           />
         </div>
-
       </div>
     </div>
+  )
+}
+
+// ── Haupt-Komponente ─────────────────────────────────────────
+export default function RecipeDetail() {
+  const { id } = useParams()
+  const isNew = id === 'new'
+  const navigate = useNavigate()
+  const household = useAuthStore(s => s.household)
+  const user = useAuthStore(s => s.user)
+  const { recipes, addRecipe, updateRecipe, deleteRecipe, uploadImage } = useRecipeStore()
+
+  const existing = recipes.find(r => r.id === id)
+  const [editMode, setEditMode] = useState(isNew)
+
+  const handleSave = async (data) => {
+    if (isNew) {
+      await addRecipe(data, household.id)
+      navigate('/recipes')
+    } else {
+      await updateRecipe(id, data, household.id)
+      setEditMode(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!confirm('Rezept wirklich löschen?')) return
+    await deleteRecipe(id, household.id)
+    navigate('/recipes')
+  }
+
+  if (!isNew && !existing) return (
+    <div style={{padding: '32px', textAlign: 'center', color: 'var(--color-text-muted)'}}>
+      Rezept nicht gefunden
+    </div>
+  )
+
+  if (editMode) {
+    return (
+      <RecipeEdit
+        recipe={existing}
+        isNew={isNew}
+        onSave={handleSave}
+        onCancel={() => isNew ? navigate(-1) : setEditMode(false)}
+        household={household}
+        user={user}
+        uploadImage={uploadImage}
+      />
+    )
+  }
+
+  return (
+    <RecipeView
+      recipe={existing}
+      onEdit={() => setEditMode(true)}
+      onDelete={handleDelete}
+      onCook={() => navigate(`/cook/${id}`)}
+      navigate={navigate}
+    />
   )
 }
