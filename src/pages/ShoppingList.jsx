@@ -4,6 +4,7 @@ import { useShoppingStore, isBasicIngredient } from '../store/useShoppingStore'
 import { usePlanStore } from '../store/usePlanStore'
 import { useAuthStore } from '../store/useAuthStore'
 import { supabase } from '../lib/supabase'
+import { SkeletonShoppingGroup, SkeletonStyles } from '../components/Skeleton'
 
 const CATEGORIES_ING = [
   'Obst & Gemüse', 'Fleisch & Fisch', 'Kühlregal', 'Milchprodukte',
@@ -399,14 +400,16 @@ export default function ShoppingList() {
 
       {/* Liste */}
       <div style={{padding: '0 16px'}}>
-        {loading ? (
-          <div style={{
-            textAlign: 'center', padding: '48px',
-            color: 'var(--color-text-muted)'
-          }}>
-            Lade Liste...
-          </div>
-        ) : groups.length === 0 ? (
+{loading ? (
+  <>
+    <SkeletonStyles />
+    <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+      <SkeletonShoppingGroup />
+      <SkeletonShoppingGroup />
+      <SkeletonShoppingGroup />
+    </div>
+  </>
+) : groups.length === 0 ? (
           <div style={{textAlign: 'center', padding: '48px'}}>
             <div style={{fontSize: '48px', marginBottom: '12px'}}>🛒</div>
             <p style={{

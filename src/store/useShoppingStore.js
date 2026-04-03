@@ -86,51 +86,64 @@ export const useShoppingStore = create((set, get) => ({
   },
 
   generateFromPlan: async (entries, householdId, planId) => {
-    const { list } = get()
-    if (!list) return
+  const { list, items } = get()
+  if (!list) return
 
-    await supabase.from('shopping_items')
-      .delete()
-      .eq('list_id', list.id)
-      .eq('is_manual', false)
+  // Nur automatische Artikel löschen — manuelle bleiben
+  await supabase.from('shopping_items')
+    .delete()
+    .eq('list_id', list.id)
+    .eq('is_manual', false)
 
-    // Zutaten zusammenfassen mit Portions-Skalierung
-    const itemMap = {}
-    entries.forEach(entry => {
-      if (!entry.recipes?.ingredients) return
-      const factor = (entry.servings || 2) / (entry.recipes.servings || 2)
-      entry.recipes.ingredients?.forEach(ing => {
-        if (!ing.name?.trim()) return
-        const key = `${ing.name.toLowerCase().trim()}__${ing.unit || ''}`
-        if (itemMap[key]) {
-          itemMap[key].amount = itemMap[key].amount != null && ing.amount != null
-            ? Math.round((itemMap[key].amount + ing.amount * factor) * 10) / 10
-            : itemMap[key].amount
-          // Gerichte merken für Zusammenfassung
-          if (!itemMap[key].sources.includes(entry.recipes.name)) {
-            itemMap[key].sources.push(entry.recipes.name)
-          }
-        } else {
-          itemMap[key] = {
-            list_id: list.id,
-            name: ing.name.trim(),
-            amount: ing.amount != null ? Math.round(ing.amount * factor * 10) / 10 : null,
-            unit: ing.unit || null,
-            category: normalizeCategory(ing.category),
-            is_manual: false,
-            sources: [entry.recipes.name]
-          }
+  // Manuelle Artikel merken um Duplikate zu vermeiden
+  const manualNames = items
+    .filter(i => i.is_manual)
+    .map(i => i.name.toLowerCase().trim())
+
+  const itemMap = {}
+  entries.forEach(entry => {
+    if (!entry.recipes?.ingredients) return
+    const factor = (entry.servings || 2) / (entry.recipes.servings || 2)
+    entry.recipes.ingredients?.forEach(ing => {
+      if (!ing.name?.trim()) return
+
+      // Nicht hinzufügen wenn manuell bereits vorhanden
+      if (manualNames.includes(ing.name.toLowerCase().trim())) return
+
+      const key = ing.name.toLowerCase().trim() + '__' + (ing.unit || '')
+      if (itemMap[key]) {
+        itemMap[key].amount = itemMap[key].amount != null && ing.amount != null
+          ? Math.round((itemMap[key].amount + ing.amount * factor) * 10) / 10
+          : itemMap[key].amount
+      } else {
+        itemMap[key] = {
+          list_id: list.id,
+          name: ing.name.trim(),
+          amount: ing.amount != null
+            ? Math.round(ing.amount * factor * 10) / 10
+            : null,
+          unit: ing.unit || null,
+          category: normalizeCategory(ing.category),
+          is_manual: false
         }
-      })
+      }
     })
+  })
 
-    const newItems = Object.values(itemMap).map(({ sources, ...item }) => item)
-    if (newItems.length > 0) {
-      await supabase.from('shopping_items').insert(newItems)
-    }
+  const newItems = Object.values(itemMap)
+  if (newItems.length > 0) {
+    await supabase.from('shopping_items').insert(newItems)
+  }
 
-    await get().fetchList(householdId, get().list?.plan_id)
-  },
+  // Alle Items neu laden
+  const { data } = await supabase
+    .from('shopping_items')
+    .select()
+    .eq('list_id', list.id)
+    .order('category')
+
+  set({ items: data || [] })
+},
 
   addManualItem: async (name, amount, unit, category) => {
     const { list, items } = get()

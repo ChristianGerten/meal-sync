@@ -4,6 +4,7 @@ import { useRecipeStore } from '../store/useRecipeStore'
 import { useAuthStore } from '../store/useAuthStore'
 import ImportModal from '../components/recipes/ImportModal'
 import { Heart, Star, Search, Plus, SlidersHorizontal } from 'lucide-react'
+import { SkeletonRecipeCard, SkeletonStyles } from '../components/Skeleton'
 
 const CATEGORIES = [
   'Alle', 'Favoriten', '⭐ Bewertet',
@@ -201,43 +202,18 @@ export default function Recipes() {
       )}
 
       {/* Rezept Grid */}
-      {loading ? (
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px'
-        }}>
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} style={{
-              background: 'var(--color-surface)',
-              border: '0.5px solid var(--color-border)',
-              borderRadius: '16px', overflow: 'hidden'
-            }}>
-              <div style={{
-                aspectRatio: '4/3',
-                background: 'var(--color-surface-2)',
-                animation: 'pulse 1.5s ease-in-out infinite'
-              }} />
-              <div style={{padding: '10px'}}>
-                <div style={{
-                  height: '14px', background: 'var(--color-surface-2)',
-                  borderRadius: '4px', marginBottom: '6px',
-                  animation: 'pulse 1.5s ease-in-out infinite'
-                }} />
-                <div style={{
-                  height: '10px', background: 'var(--color-surface-2)',
-                  borderRadius: '4px', width: '60%',
-                  animation: 'pulse 1.5s ease-in-out infinite'
-                }} />
-              </div>
-            </div>
-          ))}
-          <style>{`
-            @keyframes pulse {
-              0%, 100% { opacity: 1; }
-              50% { opacity: 0.5; }
-            }
-          `}</style>
-        </div>
-      ) : filtered.length === 0 ? (
+{loading ? (
+  <>
+    <SkeletonStyles />
+    <div style={{
+      display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px'
+    }}>
+      {[1, 2, 3, 4, 5, 6].map(i => (
+        <SkeletonRecipeCard key={i} />
+      ))}
+    </div>
+  </>
+) : filtered.length === 0 ? (
         <div style={{textAlign: 'center', padding: '48px'}}>
           <div style={{fontSize: '48px', marginBottom: '12px'}}>👨‍🍳</div>
           <p style={{

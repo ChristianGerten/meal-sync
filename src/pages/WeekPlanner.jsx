@@ -6,6 +6,7 @@ import { useRecipeStore } from '../store/useRecipeStore'
 import { useAuthStore } from '../store/useAuthStore'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Plus, X, ChefHat, FileText, Users } from 'lucide-react'
+import { SkeletonPlanDay, SkeletonStyles } from '../components/Skeleton'
 
 const DAYS = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
 const DAYS_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
@@ -186,14 +187,15 @@ export default function WeekPlanner() {
         })}
       </div>
 
-      {loading ? (
-        <p style={{
-          color: 'var(--color-text-muted)',
-          textAlign: 'center', padding: '32px'
-        }}>
-          Lädt...
-        </p>
-      ) : (
+{loading ? (
+  <>
+    <SkeletonStyles />
+    <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
+      <SkeletonPlanDay />
+      <SkeletonPlanDay />
+    </div>
+  </>
+) : (
         <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
 
           {/* Tagesname */}
