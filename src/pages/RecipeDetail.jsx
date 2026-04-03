@@ -264,9 +264,9 @@ function RecipeView({ recipe, onEdit, onDelete, onCook, navigate }) {
           </div>
         )}
 
-{recipe.source_url && (
+{recipe['source_url'] && (
   
-    href={String(recipe.source_url)}
+    href={recipe['source_url']}
     target="_blank"
     rel="noopener noreferrer"
     style={{
