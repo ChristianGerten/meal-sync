@@ -307,6 +307,28 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
   const [quickMode, setQuickMode] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
+
+  // Änderungen tracken
+  const updateForm = (updater) => {
+    setForm(updater)
+    setIsDirty(true)
+  }
+  const updateIngredients = (val) => {
+    setIngredients(val)
+    setIsDirty(true)
+  }
+  const updateSteps = (val) => {
+    setSteps(val)
+    setIsDirty(true)
+  }
+
+  const handleCancel = () => {
+    if (isDirty) {
+      if (!window.confirm('Änderungen verwerfen?')) return
+    }
+    onCancel()
+  }
 
   const handleSave = async () => {
     if (!form.name.trim()) {
@@ -329,6 +351,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
           description: s
         }))
       })
+      setIsDirty(false)
     } finally {
       setSaving(false)
     }
@@ -340,7 +363,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
     setUploading(true)
     try {
       const url = await uploadImage(file, user.id)
-      setForm(f => ({ ...f, image_url: url }))
+      updateForm(f => ({ ...f, image_url: url }))
     } finally {
       setUploading(false)
     }
@@ -350,14 +373,14 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
     const lines = quickInput.split('\n').filter(l => l.trim())
     const parsed = lines.map(parseIngredientLine).filter(Boolean)
     if (parsed.length) {
-      setIngredients(prev => [...prev.filter(i => i.name.trim()), ...parsed])
+      updateIngredients(prev => [...prev.filter(i => i.name.trim()), ...parsed])
       setQuickInput('')
       setQuickMode(false)
     }
   }
 
   const toggleTag = (tag) => {
-    setForm(f => ({
+    updateForm(f => ({
       ...f,
       tags: f.tags.includes(tag)
         ? f.tags.filter(t => t !== tag)
@@ -368,7 +391,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
   const updateIng = (i, field, val) => {
     const copy = [...ingredients]
     copy[i] = { ...copy[i], [field]: val }
-    setIngredients(copy)
+    updateIngredients(copy)
   }
 
   const inputStyle = {
@@ -388,7 +411,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
         padding: '12px 16px',
         display: 'flex', alignItems: 'center', gap: '12px'
       }}>
-        <button onClick={onCancel} style={{
+        <button onClick={handleCancel} style={{
           background: 'none', border: 'none', cursor: 'pointer',
           color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center'
         }}>
@@ -398,6 +421,14 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
           fontWeight: '600', fontSize: '16px', color: 'var(--color-text)', flex: 1
         }}>
           {isNew ? 'Neues Rezept' : 'Bearbeiten'}
+          {isDirty && (
+            <span style={{
+              marginLeft: '8px', fontSize: '11px',
+              color: '#f59e0b', fontWeight: '400'
+            }}>
+              · ungespeichert
+            </span>
+          )}
         </span>
         <button onClick={handleSave} disabled={saving} style={{
           display: 'flex', alignItems: 'center', gap: '6px',
@@ -449,7 +480,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
 
         <input
           value={form.name}
-          onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+          onChange={e => updateForm(f => ({ ...f, name: e.target.value }))}
           placeholder="Rezeptname *"
           style={{
             ...inputStyle,
@@ -468,7 +499,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
             Portionen
           </span>
           <button
-            onClick={() => setForm(f => ({ ...f, servings: Math.max(1, f.servings - 1) }))}
+            onClick={() => updateForm(f => ({ ...f, servings: Math.max(1, f.servings - 1) }))}
             style={{
               width: '30px', height: '30px', borderRadius: '8px',
               background: 'var(--color-surface-2)',
@@ -476,9 +507,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
               cursor: 'pointer', fontSize: '18px', color: 'var(--color-text)',
               display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}
-          >
-            -
-          </button>
+          >-</button>
           <span style={{
             fontSize: '16px', fontWeight: '600', color: 'var(--color-text)',
             minWidth: '24px', textAlign: 'center'
@@ -486,7 +515,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
             {form.servings}
           </span>
           <button
-            onClick={() => setForm(f => ({ ...f, servings: f.servings + 1 }))}
+            onClick={() => updateForm(f => ({ ...f, servings: f.servings + 1 }))}
             style={{
               width: '30px', height: '30px', borderRadius: '8px',
               background: 'var(--color-surface-2)',
@@ -494,9 +523,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
               cursor: 'pointer', fontSize: '18px', color: 'var(--color-text)',
               display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}
-          >
-            +
-          </button>
+          >+</button>
         </div>
 
         <div>
@@ -508,7 +535,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
           </div>
           <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
             {CATEGORIES.map(cat => (
-              <button key={cat} onClick={() => setForm(f => ({
+              <button key={cat} onClick={() => updateForm(f => ({
                 ...f, category: f.category === cat ? '' : cat
               }))} style={{
                 padding: '7px 14px', borderRadius: '20px', cursor: 'pointer',
@@ -652,7 +679,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
                   {CATEGORIES_ING.map(c => <option key={c}>{c}</option>)}
                 </select>
                 <button
-                  onClick={() => setIngredients(ingredients.filter((_, j) => j !== i))}
+                  onClick={() => updateIngredients(ingredients.filter((_, j) => j !== i))}
                   style={{
                     background: 'none', border: 'none', cursor: 'pointer',
                     padding: '6px', color: 'var(--color-text-muted)',
@@ -666,7 +693,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
           </div>
 
           <button
-            onClick={() => setIngredients([...ingredients, emptyIngredient()])}
+            onClick={() => updateIngredients([...ingredients, emptyIngredient()])}
             style={{
               marginTop: '10px', display: 'flex', alignItems: 'center', gap: '5px',
               background: 'none', border: 'none', cursor: 'pointer',
@@ -707,7 +734,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
                   onChange={e => {
                     const copy = [...steps]
                     copy[i] = e.target.value
-                    setSteps(copy)
+                    updateSteps(copy)
                   }}
                   placeholder={'Schritt ' + (i + 1) + '...'}
                   rows={2}
@@ -722,7 +749,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
                 />
                 {steps.length > 1 && (
                   <button
-                    onClick={() => setSteps(steps.filter((_, j) => j !== i))}
+                    onClick={() => updateSteps(steps.filter((_, j) => j !== i))}
                     style={{
                       background: 'none', border: 'none', cursor: 'pointer',
                       padding: '6px', color: 'var(--color-text-muted)',
@@ -736,7 +763,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
             ))}
           </div>
           <button
-            onClick={() => setSteps([...steps, ''])}
+            onClick={() => updateSteps([...steps, ''])}
             style={{
               marginTop: '10px', display: 'flex', alignItems: 'center', gap: '5px',
               background: 'none', border: 'none', cursor: 'pointer',
@@ -758,7 +785,7 @@ function RecipeEdit({ recipe, isNew, onSave, onCancel, household, user, uploadIm
           </div>
           <textarea
             value={form.description}
-            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+            onChange={e => updateForm(f => ({ ...f, description: e.target.value }))}
             placeholder="Variationen, Tipps, Hinweise..."
             rows={3}
             style={{
