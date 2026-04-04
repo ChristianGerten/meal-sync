@@ -1,46 +1,24 @@
 import { useEffect, useState, useRef } from 'react'
-import { RefreshCw, Plus, Check, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { useShoppingStore, isBasicIngredient } from '../store/useShoppingStore'
 import { usePlanStore } from '../store/usePlanStore'
 import { useAuthStore } from '../store/useAuthStore'
 import { supabase } from '../lib/supabase'
 import { SkeletonShoppingGroup, SkeletonStyles } from '../components/Skeleton'
 
-const CATEGORIES_ING = [
+const SUPERMARKET_CATS = [
   'Obst & Gemüse', 'Fleisch & Fisch', 'Kühlregal', 'Milchprodukte',
   'Brot & Backwaren', 'Nudeln', 'Reis & Getreide', 'Konserven',
   'Gewürze', 'Backen', 'Getränke', 'Tiefkühl', 'Sonstiges'
 ]
 
-// Swipe-to-check Hook
-function useSwipe(onSwipeRight, onSwipeLeft) {
+const DRUGSTORE_CATS = [
+  'Körperpflege', 'Haushalt', 'Gesundheit', 'Baby', 'Sonstiges (Drogerie)'
+]
+
+function SwipeItem({ item, onToggle, onDelete }) {
   const startX = useRef(null)
-  const startY = useRef(null)
-
-  const onTouchStart = (e) => {
-    startX.current = e.touches[0].clientX
-    startY.current = e.touches[0].clientY
-  }
-
-  const onTouchEnd = (e) => {
-    if (startX.current === null) return
-    const dx = e.changedTouches[0].clientX - startX.current
-    const dy = e.changedTouches[0].clientY - startY.current
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-      if (dx > 0) onSwipeRight?.()
-      else onSwipeLeft?.()
-    }
-    startX.current = null
-    startY.current = null
-  }
-
-  return { onTouchStart, onTouchEnd }
-}
-
-function ShoppingItemRow({ item, onToggle, onDelete }) {
-  const [swiping, setSwiping] = useState(0) // -1 links, 0 neutral, 1 rechts
   const [offsetX, setOffsetX] = useState(0)
-  const startX = useRef(null)
   const isDragging = useRef(false)
 
   const handleTouchStart = (e) => {
@@ -52,18 +30,13 @@ function ShoppingItemRow({ item, onToggle, onDelete }) {
     if (!isDragging.current) return
     const dx = e.touches[0].clientX - startX.current
     setOffsetX(Math.max(-80, Math.min(80, dx)))
-    setSwiping(dx > 20 ? 1 : dx < -20 ? -1 : 0)
   }
 
   const handleTouchEnd = () => {
     isDragging.current = false
-    if (offsetX > 60) {
-      onToggle(!item.is_checked)
-    } else if (offsetX < -60 && item.is_manual) {
-      onDelete()
-    }
+    if (offsetX > 60) onToggle(!item.is_checked)
+    else if (offsetX < -60 && item.is_manual) onDelete()
     setOffsetX(0)
-    setSwiping(0)
   }
 
   const formatAmount = (amount) => {
@@ -74,29 +47,27 @@ function ShoppingItemRow({ item, onToggle, onDelete }) {
 
   return (
     <div style={{position: 'relative', overflow: 'hidden'}}>
-      {/* Hintergrund-Feedback beim Swipen */}
-      {swiping === 1 && (
+      {offsetX > 20 && (
         <div style={{
           position: 'absolute', inset: 0,
-          background: item.is_checked ? '#fef3c7' : '#dcfce7',
-          display: 'flex', alignItems: 'center', paddingLeft: '16px',
-          transition: 'background 0.1s'
+          background: item.is_checked ? '#fef3c7' : '#f0fdf4',
+          display: 'flex', alignItems: 'center', paddingLeft: '16px'
         }}>
-          <Check size={18} color={item.is_checked ? '#d97706' : '#16a34a'} strokeWidth={2.5} />
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <polyline points="3,9 7,13 15,5" stroke={item.is_checked ? '#d97706' : '#16a34a'} strokeWidth="2.5" strokeLinecap="round"/>
+          </svg>
         </div>
       )}
-      {swiping === -1 && item.is_manual && (
+      {offsetX < -20 && item.is_manual && (
         <div style={{
-          position: 'absolute', inset: 0,
-          background: '#fee2e2',
-          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-          paddingRight: '16px'
+          position: 'absolute', inset: 0, background: '#fef2f2',
+          display: 'flex', alignItems: 'center',
+          justifyContent: 'flex-end', paddingRight: '16px'
         }}>
-          <Trash2 size={18} color="#dc2626" />
+          <Trash2 size={16} color="#dc2626" />
         </div>
       )}
 
-      {/* Item */}
       <div
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -105,17 +76,15 @@ function ShoppingItemRow({ item, onToggle, onDelete }) {
           display: 'flex', alignItems: 'center', gap: '12px',
           padding: '13px 14px',
           background: 'var(--color-surface)',
-          transform: `translateX(${offsetX}px)`,
+          transform: 'translateX(' + offsetX + 'px)',
           transition: isDragging.current ? 'none' : 'transform 0.2s ease',
-          cursor: 'pointer',
           userSelect: 'none'
         }}
       >
-        {/* Checkbox */}
         <button
           onClick={() => onToggle(!item.is_checked)}
           style={{
-            width: '24px', height: '24px', borderRadius: '7px',
+            width: '24px', height: '24px', borderRadius: '50%',
             border: item.is_checked ? 'none' : '1.5px solid var(--color-border)',
             background: item.is_checked ? 'var(--color-accent)' : 'transparent',
             cursor: 'pointer', flexShrink: 0,
@@ -123,39 +92,37 @@ function ShoppingItemRow({ item, onToggle, onDelete }) {
             transition: 'all 0.15s'
           }}
         >
-          {item.is_checked && <Check size={14} color="#fff" strokeWidth={3} />}
+          {item.is_checked && (
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <polyline points="2,6 5,9 10,3" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
+          )}
         </button>
 
-        {/* Name & Menge */}
-        <div style={{flex: 1, minWidth: 0}}>
-          <span style={{
-            fontSize: '15px',
-            color: item.is_checked ? 'var(--color-text-muted)' : 'var(--color-text)',
-            textDecoration: item.is_checked ? 'line-through' : 'none',
-            transition: 'all 0.15s'
-          }}>
-            {item.name}
-          </span>
-        </div>
+        <span style={{
+          flex: 1, fontSize: '15px',
+          color: item.is_checked ? 'var(--color-text-muted)' : 'var(--color-text)',
+          textDecoration: item.is_checked ? 'line-through' : 'none',
+          transition: 'all 0.15s'
+        }}>
+          {item.name}
+        </span>
 
-        {/* Menge */}
         {(item.amount || item.unit) && (
           <span style={{
             fontSize: '13px', fontWeight: '500',
-            color: item.is_checked ? 'var(--color-text-muted)' : 'var(--color-text-muted)',
-            flexShrink: 0
+            color: 'var(--color-text-muted)', flexShrink: 0
           }}>
-            {formatAmount(item.amount)}{item.unit ? ` ${item.unit}` : ''}
+            {formatAmount(item.amount)}{item.unit ? ' ' + item.unit : ''}
           </span>
         )}
 
-        {/* Löschen (nur manuell, Desktop) */}
         {item.is_manual && (
           <button
-            onClick={onDelete}
+            onClick={() => onDelete()}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              padding: '4px', color: 'var(--color-text-muted)',
+              padding: '2px', color: 'var(--color-text-muted)',
               display: 'flex', alignItems: 'center', flexShrink: 0
             }}
           >
@@ -172,15 +139,16 @@ export default function ShoppingList() {
   const { currentPlan } = usePlanStore()
   const {
     fetchList, generateFromPlan, addManualItem,
-    toggleItem, deleteItem, getGroupedItems, loading, items
+    toggleItem, deleteItem, clearChecked,
+    getGroupedItems, loading, items, drugstoreItems
   } = useShoppingStore()
 
+  const [activeStore, setActiveStore] = useState('supermarket')
   const [newItem, setNewItem] = useState('')
-  const [newCategory, setNewCategory] = useState('Sonstiges')
+  const [newCategory, setNewCategory] = useState('')
   const [generating, setGenerating] = useState(false)
-  const [showBasics, setShowBasics] = useState(false)
-  const [collapsedGroups, setCollapsedGroups] = useState({})
   const [showAddForm, setShowAddForm] = useState(false)
+  const [showBasics, setShowBasics] = useState(false)
 
   useEffect(() => {
     if (household && currentPlan) {
@@ -199,29 +167,27 @@ export default function ShoppingList() {
     } finally { setGenerating(false) }
   }
 
-  const handleAddManual = async (e) => {
-    e.preventDefault()
+  const handleAddItem = async () => {
     if (!newItem.trim()) return
-    await addManualItem(newItem.trim(), null, null, newCategory)
+    const defaultCat = activeStore === 'drugstore' ? 'Körperpflege' : 'Sonstiges'
+    await addManualItem(newItem.trim(), null, null, newCategory || defaultCat, activeStore)
     setNewItem('')
+    setNewCategory('')
     setShowAddForm(false)
   }
 
-  const toggleGroup = (cat) =>
-    setCollapsedGroups(prev => ({ ...prev, [cat]: !prev[cat] }))
+  const groups = getGroupedItems(activeStore, showBasics)
 
-  const groups = getGroupedItems(showBasics)
-
-  const totalItems = items.filter(i => showBasics || !isBasicIngredient(i.name)).length
-  const checkedItems = items.filter(i =>
-    i.is_checked && (showBasics || !isBasicIngredient(i.name))
-  ).length
-  const hiddenBasicsCount = items.filter(i => isBasicIngredient(i.name)).length
-  const progressPercent = totalItems > 0
-    ? Math.round((checkedItems / totalItems) * 100)
+  const allItems = activeStore === 'drugstore' ? drugstoreItems : items.filter(i => showBasics || !isBasicIngredient(i.name))
+  const totalItems = allItems.length
+  const checkedItems = allItems.filter(i => i.is_checked).length
+  const progressPercent = totalItems > 0 ? Math.round((checkedItems / totalItems) * 100) : 0
+  const allDone = totalItems > 0 && checkedItems === totalItems
+  const hiddenBasicsCount = activeStore === 'supermarket'
+    ? items.filter(i => isBasicIngredient(i.name)).length
     : 0
 
-  const allDone = totalItems > 0 && checkedItems === totalItems
+  const accentColor = activeStore === 'drugstore' ? '#5F5E5A' : 'var(--color-accent)'
 
   return (
     <div style={{paddingBottom: '80px'}}>
@@ -234,59 +200,121 @@ export default function ShoppingList() {
       }}>
         <div style={{
           display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', marginBottom: '10px'
+          justifyContent: 'space-between', marginBottom: '12px'
         }}>
           <div>
-            <h2 style={{
-              fontSize: '22px', fontWeight: '700',
-              color: 'var(--color-text)', margin: 0,
-              letterSpacing: '-0.5px'
+            <h1 style={{
+              fontSize: '20px', fontWeight: '600',
+              color: 'var(--color-text)', letterSpacing: '-0.3px'
             }}>
-              Einkaufsliste
-            </h2>
-            <p style={{
-              fontSize: '12px', color: 'var(--color-text-muted)',
-              margin: '2px 0 0'
-            }}>
+              Einkauf
+            </h1>
+            <p style={{fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '1px'}}>
               {totalItems === 0
                 ? 'Leer'
                 : allDone
-                  ? '✓ Alles eingekauft!'
-                  : `${checkedItems} von ${totalItems} · ${progressPercent}%`
+                  ? 'Alles erledigt'
+                  : checkedItems + ' von ' + totalItems + ' · ' + progressPercent + '%'
               }
             </p>
           </div>
+          {activeStore === 'supermarket' && (
+            <button
+              onClick={handleGenerate}
+              disabled={generating || !currentPlan}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                padding: '8px 12px',
+                background: generating ? 'var(--color-surface-2)' : 'var(--color-accent)',
+                color: generating ? 'var(--color-text-muted)' : '#fff',
+                border: 'none', borderRadius: '10px',
+                cursor: generating || !currentPlan ? 'not-allowed' : 'pointer',
+                fontSize: '12px', fontWeight: '500'
+              }}
+            >
+              <RefreshCw
+                size={13}
+                style={{animation: generating ? 'spin 1s linear infinite' : 'none'}}
+              />
+              {generating ? 'Lädt...' : 'Neu laden'}
+            </button>
+          )}
+        </div>
+
+        {/* Store Tabs */}
+        <div style={{
+          display: 'flex', gap: '6px', marginBottom: '10px'
+        }}>
           <button
-            onClick={handleGenerate}
-            disabled={generating || !currentPlan}
+            onClick={() => setActiveStore('supermarket')}
             style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '9px 14px',
-              background: generating ? 'var(--color-surface-2)' : 'var(--color-accent)',
-              color: generating ? 'var(--color-text-muted)' : '#fff',
-              border: 'none', borderRadius: '12px',
-              cursor: generating || !currentPlan ? 'not-allowed' : 'pointer',
-              fontSize: '13px', fontWeight: '500'
+              flex: 1, padding: '9px',
+              borderRadius: '10px', border: 'none', cursor: 'pointer',
+              background: activeStore === 'supermarket'
+                ? 'var(--color-accent)'
+                : 'var(--color-surface)',
+              color: activeStore === 'supermarket' ? '#fff' : 'var(--color-text-muted)',
+              fontSize: '13px', fontWeight: activeStore === 'supermarket' ? '500' : '400',
+              border: activeStore === 'supermarket'
+                ? 'none'
+                : '0.5px solid var(--color-border)',
+              transition: 'all 0.15s'
             }}
           >
-            <RefreshCw
-              size={14}
-              style={{animation: generating ? 'spin 1s linear infinite' : 'none'}}
-            />
-            {generating ? 'Lädt...' : 'Neu laden'}
+            Supermarkt
+            {items.filter(i => !i.is_checked).length > 0 && (
+              <span style={{
+                marginLeft: '6px', fontSize: '11px',
+                background: activeStore === 'supermarket'
+                  ? 'rgba(255,255,255,0.25)'
+                  : 'var(--color-surface-2)',
+                padding: '1px 6px', borderRadius: '20px'
+              }}>
+                {items.filter(i => !i.is_checked && (showBasics || !isBasicIngredient(i.name))).length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveStore('drugstore')}
+            style={{
+              flex: 1, padding: '9px',
+              borderRadius: '10px', border: 'none', cursor: 'pointer',
+              background: activeStore === 'drugstore'
+                ? '#5F5E5A'
+                : 'var(--color-surface)',
+              color: activeStore === 'drugstore' ? '#fff' : 'var(--color-text-muted)',
+              fontSize: '13px', fontWeight: activeStore === 'drugstore' ? '500' : '400',
+              border: activeStore === 'drugstore'
+                ? 'none'
+                : '0.5px solid var(--color-border)',
+              transition: 'all 0.15s'
+            }}
+          >
+            Drogerie
+            {drugstoreItems.filter(i => !i.is_checked).length > 0 && (
+              <span style={{
+                marginLeft: '6px', fontSize: '11px',
+                background: activeStore === 'drugstore'
+                  ? 'rgba(255,255,255,0.25)'
+                  : 'var(--color-surface-2)',
+                padding: '1px 6px', borderRadius: '20px'
+              }}>
+                {drugstoreItems.filter(i => !i.is_checked).length}
+              </span>
+            )}
           </button>
         </div>
 
-        {/* Progress Bar */}
+        {/* Fortschrittsbalken */}
         {totalItems > 0 && (
           <div style={{
-            height: '4px', background: 'var(--color-surface-2)',
-            borderRadius: '2px', overflow: 'hidden', marginBottom: '12px'
+            height: '3px', background: 'var(--color-surface-2)',
+            borderRadius: '2px', overflow: 'hidden', marginBottom: '10px'
           }}>
             <div style={{
               height: '100%',
-              background: allDone ? '#22c55e' : 'var(--color-accent)',
-              width: `${progressPercent}%`,
+              background: allDone ? '#22c55e' : accentColor,
+              width: progressPercent + '%',
               borderRadius: '2px', transition: 'width 0.4s ease'
             }} />
           </div>
@@ -294,23 +322,24 @@ export default function ShoppingList() {
 
         {/* Artikel hinzufügen */}
         {showAddForm ? (
-          <form onSubmit={handleAddManual} style={{
+          <div style={{
             background: 'var(--color-surface)',
             border: '0.5px solid var(--color-border)',
-            borderRadius: '14px', padding: '12px',
+            borderRadius: '12px', padding: '10px',
             marginBottom: '10px',
-            display: 'flex', flexDirection: 'column', gap: '8px'
+            display: 'flex', flexDirection: 'column', gap: '7px'
           }}>
             <input
               value={newItem}
               onChange={e => setNewItem(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAddItem()}
               placeholder="Artikel eingeben..."
               autoFocus
               style={{
-                padding: '10px 14px',
+                padding: '9px 12px',
                 background: 'var(--color-surface-2)',
                 border: '0.5px solid var(--color-border)',
-                borderRadius: '10px', fontSize: '15px',
+                borderRadius: '9px', fontSize: '14px',
                 color: 'var(--color-text)', outline: 'none'
               }}
             />
@@ -318,81 +347,83 @@ export default function ShoppingList() {
               value={newCategory}
               onChange={e => setNewCategory(e.target.value)}
               style={{
-                padding: '9px 12px',
+                padding: '8px 10px',
                 background: 'var(--color-surface-2)',
                 border: '0.5px solid var(--color-border)',
-                borderRadius: '10px', fontSize: '14px',
+                borderRadius: '9px', fontSize: '13px',
                 color: 'var(--color-text)', outline: 'none'
               }}
             >
-              {CATEGORIES_ING.map(c => <option key={c}>{c}</option>)}
+              <option value="">Kategorie wählen...</option>
+              {(activeStore === 'drugstore' ? DRUGSTORE_CATS : SUPERMARKET_CATS).map(c => (
+                <option key={c}>{c}</option>
+              ))}
             </select>
-            <div style={{display: 'flex', gap: '8px'}}>
-              <button type="submit" style={{
-                flex: 1, padding: '10px',
-                background: 'var(--color-accent)', color: '#fff',
-                border: 'none', borderRadius: '10px',
-                cursor: 'pointer', fontSize: '14px', fontWeight: '500'
+            <div style={{display: 'flex', gap: '7px'}}>
+              <button onClick={handleAddItem} style={{
+                flex: 1, padding: '9px',
+                background: accentColor, color: '#fff',
+                border: 'none', borderRadius: '9px',
+                cursor: 'pointer', fontSize: '13px', fontWeight: '500'
               }}>
                 Hinzufügen
               </button>
               <button
-                type="button"
                 onClick={() => { setShowAddForm(false); setNewItem('') }}
                 style={{
-                  padding: '10px 14px',
+                  padding: '9px 12px',
                   background: 'var(--color-surface-2)',
                   border: '0.5px solid var(--color-border)',
-                  borderRadius: '10px', cursor: 'pointer',
-                  fontSize: '14px', color: 'var(--color-text-muted)'
+                  borderRadius: '9px', cursor: 'pointer',
+                  fontSize: '13px', color: 'var(--color-text-muted)'
                 }}
               >
                 Abbrechen
               </button>
             </div>
-          </form>
+          </div>
         ) : (
           <button
             onClick={() => setShowAddForm(true)}
             style={{
-              width: '100%', padding: '11px',
+              width: '100%', padding: '10px',
               background: 'var(--color-surface)',
               border: '0.5px solid var(--color-border)',
-              borderRadius: '12px', cursor: 'pointer',
-              fontSize: '14px', color: 'var(--color-text-muted)',
+              borderRadius: '10px', cursor: 'pointer',
+              fontSize: '13px', color: 'var(--color-text-muted)',
               display: 'flex', alignItems: 'center', gap: '8px',
               marginBottom: '10px'
             }}
           >
             <div style={{
-              width: '22px', height: '22px', borderRadius: '6px',
-              background: 'var(--color-accent-soft)',
+              width: '20px', height: '20px', borderRadius: '5px',
+              background: activeStore === 'drugstore'
+                ? 'rgba(95,94,90,0.1)'
+                : 'var(--color-accent-soft)',
               display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}>
-              <Plus size={14} color="var(--color-accent)" />
+              <Plus size={13} color={accentColor} />
             </div>
             Artikel hinzufügen...
           </button>
         )}
 
-        {/* Basis-Zutaten Toggle */}
-        {hiddenBasicsCount > 0 && (
+        {/* Basis-Zutaten Toggle — nur Supermarkt */}
+        {activeStore === 'supermarket' && hiddenBasicsCount > 0 && (
           <button
             onClick={() => setShowBasics(s => !s)}
             style={{
-              width: '100%', padding: '8px',
+              width: '100%', padding: '7px',
               background: 'none',
               border: '0.5px solid var(--color-border)',
-              borderRadius: '10px', cursor: 'pointer',
-              fontSize: '12px', color: 'var(--color-text-muted)',
-              marginBottom: '10px',
-              display: 'flex', alignItems: 'center',
-              justifyContent: 'center', gap: '5px'
+              borderRadius: '9px', cursor: 'pointer',
+              fontSize: '11px', color: 'var(--color-text-muted)',
+              marginBottom: '10px'
             }}
           >
             {showBasics
-              ? `Basis-Zutaten ausblenden`
-              : `${hiddenBasicsCount} Basis-Zutaten ausgeblendet (Salz, Pfeffer...)`
+              ? 'Basis-Zutaten ausblenden (' + hiddenBasicsCount + ')'
+              : hiddenBasicsCount + ' Basis-Zutaten ausgeblendet (Öl, Gewürze...)'
             }
           </button>
         )}
@@ -400,130 +431,145 @@ export default function ShoppingList() {
 
       {/* Liste */}
       <div style={{padding: '0 16px'}}>
-{loading ? (
-  <>
-    <SkeletonStyles />
-    <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-      <SkeletonShoppingGroup />
-      <SkeletonShoppingGroup />
-      <SkeletonShoppingGroup />
-    </div>
-  </>
-) : groups.length === 0 ? (
-          <div style={{textAlign: 'center', padding: '48px'}}>
-            <div style={{fontSize: '48px', marginBottom: '12px'}}>🛒</div>
+        {loading ? (
+          <>
+            <SkeletonStyles />
+            <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+              <SkeletonShoppingGroup />
+              <SkeletonShoppingGroup />
+            </div>
+          </>
+        ) : groups.length === 0 ? (
+          <div style={{textAlign: 'center', padding: '48px 24px'}}>
+            <div style={{
+              width: '52px', height: '52px', borderRadius: '14px',
+              background: 'var(--color-surface-2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 14px', fontSize: '24px'
+            }}>
+              🛒
+            </div>
             <p style={{
-              fontWeight: '600', fontSize: '16px',
+              fontWeight: '500', fontSize: '15px',
               color: 'var(--color-text)', marginBottom: '6px'
             }}>
-              Liste ist leer
+              {activeStore === 'drugstore' ? 'Drogerie-Liste leer' : 'Liste ist leer'}
             </p>
             <p style={{fontSize: '13px', color: 'var(--color-text-muted)'}}>
-              Plane Gerichte und lade die Liste neu
+              {activeStore === 'drugstore'
+                ? 'Füge Artikel manuell hinzu'
+                : 'Plane Gerichte und lade die Liste neu'
+              }
             </p>
           </div>
         ) : (
-          <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+          <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
             {groups.map(({ category, items: groupItems }) => {
-              const isCollapsed = collapsedGroups[category]
               const checkedInGroup = groupItems.filter(i => i.is_checked).length
               const allGroupDone = checkedInGroup === groupItems.length && groupItems.length > 0
+              const openItems = groupItems.filter(i => !i.is_checked)
+              const doneItems = groupItems.filter(i => i.is_checked)
 
               return (
-                <div key={category} style={{
-                  background: 'var(--color-surface)',
-                  borderRadius: '16px',
-                  border: '0.5px solid var(--color-border)',
-                  overflow: 'hidden',
-                  opacity: allGroupDone ? 0.6 : 1,
-                  transition: 'opacity 0.3s'
-                }}>
-                  {/* Kategorie Header */}
-                  <button
-                    onClick={() => toggleGroup(category)}
-                    style={{
-                      width: '100%', padding: '11px 14px',
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center',
-                      justifyContent: 'space-between',
-                      borderBottom: isCollapsed
-                        ? 'none'
-                        : '0.5px solid var(--color-border)'
-                    }}
-                  >
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: '8px'
+                <div key={category}>
+                  {/* Kategorie Label */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '6px', padding: '0 2px'
+                  }}>
+                    <span style={{
+                      fontSize: '11px', fontWeight: '500',
+                      color: allGroupDone
+                        ? 'var(--color-text-muted)'
+                        : 'var(--color-text)',
+                      textTransform: 'uppercase', letterSpacing: '0.4px'
                     }}>
-                      <span style={{
-                        fontSize: '12px', fontWeight: '700',
-                        color: allGroupDone
-                          ? 'var(--color-text-muted)'
-                          : 'var(--color-text)',
-                        textTransform: 'uppercase', letterSpacing: '0.4px'
-                      }}>
-                        {category}
-                      </span>
-                      <span style={{
-                        fontSize: '11px', padding: '1px 7px',
-                        background: allGroupDone
-                          ? 'var(--color-surface-2)'
-                          : 'var(--color-accent-soft)',
-                        color: allGroupDone
-                          ? 'var(--color-text-muted)'
-                          : 'var(--color-accent-text)',
-                        borderRadius: '20px', fontWeight: '500'
-                      }}>
-                        {checkedInGroup}/{groupItems.length}
-                      </span>
-                    </div>
-                    {isCollapsed
-                      ? <ChevronDown size={15} color="var(--color-text-muted)" />
-                      : <ChevronUp size={15} color="var(--color-text-muted)" />
-                    }
-                  </button>
+                      {category}
+                    </span>
+                    <span style={{
+                      fontSize: '11px', color: 'var(--color-text-muted)'
+                    }}>
+                      {checkedInGroup}/{groupItems.length}
+                    </span>
+                  </div>
 
                   {/* Items */}
-                  {!isCollapsed && (
-                    <div>
-                      {groupItems.map((item, idx) => (
-                        <div key={item.id} style={{
-                          borderTop: idx > 0
-                            ? '0.5px solid var(--color-border)'
-                            : 'none'
-                        }}>
-                          <ShoppingItemRow
-                            item={item}
-                            onToggle={(checked) => toggleItem(item.id, checked)}
-                            onDelete={() => deleteItem(item.id)}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <div style={{
+                    background: 'var(--color-surface)',
+                    border: '0.5px solid var(--color-border)',
+                    borderRadius: '12px', overflow: 'hidden',
+                    opacity: allGroupDone ? 0.6 : 1,
+                    transition: 'opacity 0.3s'
+                  }}>
+                    {/* Offene Items zuerst */}
+                    {openItems.map((item, idx) => (
+                      <div key={item.id} style={{
+                        borderTop: idx > 0 ? '0.5px solid var(--color-border)' : 'none'
+                      }}>
+                        <SwipeItem
+                          item={item}
+                          onToggle={(checked) => toggleItem(item.id, checked, activeStore)}
+                          onDelete={() => deleteItem(item.id, activeStore)}
+                        />
+                      </div>
+                    ))}
+
+                    {/* Erledigte Items darunter mit Trenner */}
+                    {doneItems.length > 0 && openItems.length > 0 && (
+                      <div style={{height: '0.5px', background: 'var(--color-border)'}} />
+                    )}
+                    {doneItems.map((item, idx) => (
+                      <div key={item.id} style={{
+                        borderTop: idx > 0 ? '0.5px solid var(--color-border)' : 'none'
+                      }}>
+                        <SwipeItem
+                          item={item}
+                          onToggle={(checked) => toggleItem(item.id, checked, activeStore)}
+                          onDelete={() => deleteItem(item.id, activeStore)}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )
             })}
 
-            {/* Alles erledigt Banner */}
+            {/* Erledigte löschen */}
+            {checkedItems > 0 && (
+              <button
+                onClick={() => clearChecked(activeStore)}
+                style={{
+                  width: '100%', padding: '10px',
+                  background: 'none',
+                  border: '0.5px solid var(--color-border)',
+                  borderRadius: '10px', cursor: 'pointer',
+                  fontSize: '13px', color: 'var(--color-text-muted)',
+                  display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', gap: '6px'
+                }}
+              >
+                <Trash2 size={13} />
+                {checkedItems} erledigte Artikel entfernen
+              </button>
+            )}
+
+            {/* Alles erledigt */}
             {allDone && (
               <div style={{
                 padding: '20px',
                 background: 'var(--color-accent-soft)',
-                borderRadius: '16px',
                 border: '0.5px solid var(--color-accent)',
-                textAlign: 'center', marginTop: '4px'
+                borderRadius: '14px', textAlign: 'center'
               }}>
-                <div style={{fontSize: '32px', marginBottom: '8px'}}>🎉</div>
+                <div style={{fontSize: '28px', marginBottom: '8px'}}>🎉</div>
                 <p style={{
-                  fontWeight: '600', fontSize: '15px',
-                  color: 'var(--color-accent-text)', marginBottom: '4px'
+                  fontWeight: '500', fontSize: '14px',
+                  color: 'var(--color-accent-text)', marginBottom: '3px'
                 }}>
                   Einkauf erledigt!
                 </p>
-                <p style={{
-                  fontSize: '13px', color: 'var(--color-accent-text)',
-                  opacity: 0.8
-                }}>
+                <p style={{fontSize: '12px', color: 'var(--color-accent-text)', opacity: 0.7}}>
                   Alle {totalItems} Artikel eingekauft
                 </p>
               </div>
