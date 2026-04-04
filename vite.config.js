@@ -14,8 +14,8 @@ export default defineConfig({
         name: 'MealSync',
         short_name: 'MealSync',
         description: 'Gemeinsame Wochenplanung für euren Haushalt',
-        theme_color: '#5856d6',
-        background_color: '#f5f5f7',
+        theme_color: '#c1522a',
+        background_color: '#faf9f7',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
@@ -27,6 +27,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        navigateFallback: 'index.html',
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/.*/i,

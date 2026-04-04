@@ -21,12 +21,29 @@ function AppRoutes() {
   if (!household) return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100dvh', background: 'var(--color-bg)'
+      height: '100dvh', background: 'var(--color-bg)',
+      flexDirection: 'column', gap: '12px'
     }}>
-      <div style={{textAlign: 'center'}}>
-        <div style={{fontSize: '40px', marginBottom: '12px'}}>🍽️</div>
-        <p style={{color: 'var(--color-text-muted)', fontSize: '14px'}}>Lade Haushalt...</p>
+      <div style={{
+        width: '52px', height: '52px', borderRadius: '14px',
+        background: 'var(--color-accent-soft)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }}>
+        <div style={{
+          width: '24px', height: '24px', borderRadius: '6px',
+          background: 'var(--color-accent)',
+          animation: 'pulse 1.5s ease-in-out infinite'
+        }} />
       </div>
+      <p style={{color: 'var(--color-text-muted)', fontSize: '14px'}}>
+        Lade Haushalt...
+      </p>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
     </div>
   )
 
@@ -49,17 +66,43 @@ export default function App() {
   const init = useAuthStore(s => s.init)
   const loading = useAuthStore(s => s.loading)
 
-  useEffect(() => { init() }, [])
+  useEffect(() => {
+    init()
+
+    // Absoluter Fallback: nach 8 Sekunden loading beenden
+    const timeout = setTimeout(() => {
+      useAuthStore.setState({ loading: false })
+    }, 8000)
+
+    return () => clearTimeout(timeout)
+  }, [])
 
   if (loading) return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100dvh', background: 'var(--color-bg)'
+      height: '100dvh', background: 'var(--color-bg)',
+      flexDirection: 'column', gap: '12px'
     }}>
-      <div style={{textAlign: 'center'}}>
-        <div style={{fontSize: '40px', marginBottom: '12px'}}>🍽️</div>
-        <p style={{color: 'var(--color-text-muted)', fontSize: '14px'}}>MealSync lädt...</p>
+      <div style={{
+        width: '52px', height: '52px', borderRadius: '14px',
+        background: 'var(--color-accent-soft)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }}>
+        <div style={{
+          width: '24px', height: '24px', borderRadius: '6px',
+          background: 'var(--color-accent)',
+          animation: 'pulse 1.5s ease-in-out infinite'
+        }} />
       </div>
+      <p style={{color: 'var(--color-text-muted)', fontSize: '14px'}}>
+        MealSync lädt...
+      </p>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
     </div>
   )
 
