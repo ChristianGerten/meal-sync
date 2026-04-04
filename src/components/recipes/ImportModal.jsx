@@ -3,12 +3,12 @@ import { useRecipeStore } from '../../store/useRecipeStore'
 import { useAuthStore } from '../../store/useAuthStore'
 import { supabase } from '../../lib/supabase'
 import { toast } from '../Toast'
-import { X, Link, FileJson, Check, ChefHat } from 'lucide-react'
+import { X, Check, ChefHat } from 'lucide-react'
 
 const TABS = [
-  { id: 'foto', label: 'Foto', icon: '📷' },
-  { id: 'url', label: 'URL', icon: '🔗' },
-  { id: 'json', label: 'JSON', icon: '{}' },
+  { id: 'foto', label: 'Foto & Kamera' },
+  { id: 'text', label: 'Text einfügen' },
+  { id: 'json', label: 'JSON' },
 ]
 
 export default function ImportModal({ onClose }) {
@@ -18,27 +18,26 @@ export default function ImportModal({ onClose }) {
   const [loading, setLoading] = useState(false)
   const [preview, setPreview] = useState(null)
   const [error, setError] = useState('')
-  const [urlInput, setUrlInput] = useState('')
+  const [textInput, setTextInput] = useState('')
   const [jsonInput, setJsonInput] = useState('')
   const [imagePreview, setImagePreview] = useState(null)
 
   const reset = () => {
     setPreview(null)
     setError('')
-    setUrlInput('')
+    setTextInput('')
     setJsonInput('')
     setImagePreview(null)
   }
 
+  // Foto / Kamera Import
   const handleFotoImport = async (e) => {
     const file = e.target.files[0]
     if (!file) return
     setLoading(true)
     setError('')
     setPreview(null)
-
-    const imgUrl = URL.createObjectURL(file)
-    setImagePreview(imgUrl)
+    setImagePreview(URL.createObjectURL(file))
 
     try {
       const base64 = await new Promise((res, rej) => {
@@ -64,28 +63,59 @@ export default function ImportModal({ onClose }) {
     }
   }
 
-  const handleUrlImport = async () => {
-    if (!urlInput.trim()) return
+  // Text-Import via KI
+  const handleTextImport = async () => {
+    if (!textInput.trim()) return
     setLoading(true)
     setError('')
     setPreview(null)
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('scrape-recipe', {
-        body: { url: urlInput.trim() }
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1500,
+          messages: [{
+            role: 'user',
+            content: 'Extract the recipe from this text and return ONLY a single-line JSON object. Format: {"name":"","description":"","category":"","servings":2,"prep_time":null,"cook_time":null,"tags":[],"ingredients":[{"name":"","amount":null,"unit":"","category":"Sonstiges"}],"steps":["step 1","step 2"]} Ingredient categories: Gemüse, Obst, Fleisch, Fisch, Kühlregal, Milchprodukte, Nudeln, Reis & Getreide, Konserven, Gewürze, Backen, Sonstiges. Extract ALL preparation steps. ONLY JSON.\n\nText:\n' + textInput
+          }, {
+            role: 'assistant',
+            content: '{'
+          }]
+        })
       })
-      if (fnError) throw fnError
-      if (data?.error) throw new Error(data.error)
-      setPreview(data)
+
+      const aiData = await response.json()
+      const rawText = '{' + aiData.content[0].text.trim()
+      const clean = rawText
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+        .replace(/\t/g, ' ')
+        .replace(/\n/g, ' ')
+        .replace(/\r/g, ' ')
+
+      let recipe
+      try {
+        recipe = JSON.parse(clean)
+      } catch {
+        const match = rawText.match(/\{[\s\S]*\}/)
+        recipe = match ? JSON.parse(match[0]) : null
+      }
+
+      if (!recipe?.name && !recipe?.ingredients?.length) {
+        throw new Error('Kein Rezept im Text gefunden')
+      }
+
+      setPreview(recipe)
     } catch (err) {
-      setError('')
-      // URL fehlgeschlagen — Fallback-Hinweis zeigen
-      setError('url_failed')
+      setError('Fehler: ' + err.message)
     } finally {
       setLoading(false)
     }
   }
 
+  // JSON Import
   const handleJsonImport = () => {
     try {
       const parsed = JSON.parse(jsonInput)
@@ -96,6 +126,7 @@ export default function ImportModal({ onClose }) {
     }
   }
 
+  // Speichern
   const handleSave = async () => {
     if (!preview) return
     setLoading(true)
@@ -113,7 +144,7 @@ export default function ImportModal({ onClose }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
-      background: 'rgba(0,0,0,0.5)', zIndex: 200,
+      background: 'rgba(0,0,0,0.4)', zIndex: 200,
       display: 'flex', alignItems: 'flex-end'
     }}>
       <div style={{
@@ -127,36 +158,39 @@ export default function ImportModal({ onClose }) {
         <div style={{
           padding: '16px',
           borderBottom: '0.5px solid var(--color-border)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          flexShrink: 0
+          display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', flexShrink: 0
         }}>
-          <span style={{fontWeight: '600', fontSize: '16px', color: 'var(--color-text)'}}>
-            Rezept importieren
-          </span>
+          <div>
+            <span style={{
+              fontWeight: '600', fontSize: '16px', color: 'var(--color-text)'
+            }}>
+              Rezept importieren
+            </span>
+          </div>
           <button onClick={onClose} style={{
             background: 'none', border: 'none', cursor: 'pointer',
             color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center'
           }}>
-            <X size={22} />
+            <X size={20} />
           </button>
         </div>
 
         {/* Tabs */}
         <div style={{
-          display: 'flex', padding: '12px 16px', gap: '8px',
+          display: 'flex', padding: '10px 14px', gap: '6px',
           borderBottom: '0.5px solid var(--color-border)', flexShrink: 0
         }}>
-          {TABS.map(({ id, label, icon }) => (
+          {TABS.map(({ id, label }) => (
             <button key={id} onClick={() => { setTab(id); reset() }} style={{
-              flex: 1, padding: '9px 4px', borderRadius: '10px',
-              border: 'none', cursor: 'pointer', fontSize: '13px',
-              fontWeight: tab === id ? '600' : '400',
+              flex: 1, padding: '8px 4px', borderRadius: '9px',
+              border: 'none', cursor: 'pointer', fontSize: '12px',
+              fontWeight: tab === id ? '500' : '400',
               background: tab === id ? 'var(--color-accent)' : 'var(--color-surface-2)',
               color: tab === id ? '#fff' : 'var(--color-text-muted)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
               transition: 'all 0.15s'
             }}>
-              <span style={{fontSize: '14px'}}>{icon}</span> {label}
+              {label}
             </button>
           ))}
         </div>
@@ -167,207 +201,192 @@ export default function ImportModal({ onClose }) {
           {/* Foto Tab */}
           {tab === 'foto' && !preview && (
             <div>
-              {!imagePreview ? (
-                <>
-                  <p style={{
-                    fontSize: '13px', color: 'var(--color-text-muted)',
-                    marginBottom: '14px', lineHeight: '1.5'
-                  }}>
-                    Fotografiere ein Rezept aus einem Kochbuch oder mache einen Screenshot —
-                    die KI erkennt automatisch Zutaten und Zubereitungsschritte.
-                  </p>
+              <p style={{
+                fontSize: '13px', color: 'var(--color-text-muted)',
+                marginBottom: '14px', lineHeight: '1.6'
+              }}>
+                Fotografiere ein Rezept aus einem Kochbuch, mach einen Screenshot von
+                Pinterest oder einer Rezeptseite — die KI erkennt Zutaten und Schritte automatisch.
+              </p>
 
-                  {/* Zwei Buttons */}
-                  <div style={{display: 'flex', gap: '10px', marginBottom: '12px'}}>
+              <div style={{display: 'flex', gap: '10px', marginBottom: '14px'}}>
 
-                    {/* Kamera direkt */}
-                    <label style={{
-                      flex: 1, display: 'flex', flexDirection: 'column',
-                      alignItems: 'center', justifyContent: 'center',
-                      padding: '24px 12px', borderRadius: '16px',
-                      border: '1.5px solid var(--color-accent)',
-                      background: 'var(--color-accent-soft)',
-                      cursor: 'pointer', gap: '10px',
-                      transition: 'all 0.15s'
-                    }}>
-                      <span style={{fontSize: '36px'}}>📷</span>
-                      <div style={{textAlign: 'center'}}>
-                        <div style={{
-                          fontSize: '14px', fontWeight: '600',
-                          color: 'var(--color-accent-text)', marginBottom: '3px'
-                        }}>
-                          Foto aufnehmen
-                        </div>
-                        <div style={{fontSize: '11px', color: 'var(--color-accent-text)', opacity: 0.7}}>
-                          Kamera öffnen
-                        </div>
-                      </div>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={handleFotoImport}
-                        style={{display: 'none'}}
-                        disabled={loading}
-                      />
-                    </label>
-
-                    {/* Aus Galerie */}
-                    <label style={{
-                      flex: 1, display: 'flex', flexDirection: 'column',
-                      alignItems: 'center', justifyContent: 'center',
-                      padding: '24px 12px', borderRadius: '16px',
-                      border: '0.5px solid var(--color-border)',
-                      background: 'var(--color-surface-2)',
-                      cursor: 'pointer', gap: '10px',
-                      transition: 'all 0.15s'
-                    }}>
-                      <span style={{fontSize: '36px'}}>🖼️</span>
-                      <div style={{textAlign: 'center'}}>
-                        <div style={{
-                          fontSize: '14px', fontWeight: '600',
-                          color: 'var(--color-text)', marginBottom: '3px'
-                        }}>
-                          Aus Galerie
-                        </div>
-                        <div style={{fontSize: '11px', color: 'var(--color-text-muted)'}}>
-                          Foto auswählen
-                        </div>
-                      </div>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFotoImport}
-                        style={{display: 'none'}}
-                        disabled={loading}
-                      />
-                    </label>
-
-                  </div>
-
+                {/* Kamera */}
+                <label style={{
+                  flex: 1, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  padding: '22px 12px', borderRadius: '14px',
+                  border: '0.5px solid var(--color-accent)',
+                  background: 'var(--color-accent-soft)',
+                  cursor: loading ? 'not-allowed' : 'pointer', gap: '8px'
+                }}>
                   <div style={{
-                    padding: '10px 14px',
-                    background: 'var(--color-surface-2)',
-                    borderRadius: '10px', fontSize: '12px',
-                    color: 'var(--color-text-muted)', lineHeight: '1.5'
+                    width: '40px', height: '40px', borderRadius: '10px',
+                    background: 'var(--color-accent)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
                   }}>
-                    💡 Tipp: Funktioniert auch mit Screenshots von Rezeptseiten —
-                    einfach Screenshot machen und aus der Galerie importieren.
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                      <circle cx="12" cy="13" r="4"/>
+                    </svg>
                   </div>
-                </>
-              ) : (
-                /* Bild-Vorschau während KI analysiert */
-                <div>
+                  <div style={{textAlign: 'center'}}>
+                    <div style={{
+                      fontSize: '13px', fontWeight: '500',
+                      color: 'var(--color-accent-text)', marginBottom: '2px'
+                    }}>
+                      Foto aufnehmen
+                    </div>
+                    <div style={{fontSize: '11px', color: 'var(--color-accent-text)', opacity: 0.7}}>
+                      Kamera öffnen
+                    </div>
+                  </div>
+                  <input
+                    type="file" accept="image/*" capture="environment"
+                    onChange={handleFotoImport}
+                    style={{display: 'none'}} disabled={loading}
+                  />
+                </label>
+
+                {/* Galerie */}
+                <label style={{
+                  flex: 1, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  padding: '22px 12px', borderRadius: '14px',
+                  border: '0.5px solid var(--color-border)',
+                  background: 'var(--color-surface-2)',
+                  cursor: loading ? 'not-allowed' : 'pointer', gap: '8px'
+                }}>
                   <div style={{
-                    borderRadius: '16px', overflow: 'hidden',
-                    marginBottom: '12px', position: 'relative'
+                    width: '40px', height: '40px', borderRadius: '10px',
+                    background: 'var(--color-surface)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: '0.5px solid var(--color-border)'
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                      <circle cx="8.5" cy="8.5" r="1.5"/>
+                      <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                  </div>
+                  <div style={{textAlign: 'center'}}>
+                    <div style={{
+                      fontSize: '13px', fontWeight: '500',
+                      color: 'var(--color-text)', marginBottom: '2px'
+                    }}>
+                      Aus Galerie
+                    </div>
+                    <div style={{fontSize: '11px', color: 'var(--color-text-muted)'}}>
+                      Screenshot wählen
+                    </div>
+                  </div>
+                  <input
+                    type="file" accept="image/*"
+                    onChange={handleFotoImport}
+                    style={{display: 'none'}} disabled={loading}
+                  />
+                </label>
+
+              </div>
+
+              {/* Tipp */}
+              <div style={{
+                padding: '10px 13px',
+                background: 'var(--color-surface-2)',
+                borderRadius: '10px',
+                border: '0.5px solid var(--color-border)'
+              }}>
+                <div style={{
+                  fontSize: '12px', fontWeight: '500',
+                  color: 'var(--color-text)', marginBottom: '4px'
+                }}>
+                  Tipp für Pinterest & Chefkoch
+                </div>
+                <div style={{fontSize: '12px', color: 'var(--color-text-muted)', lineHeight: '1.5'}}>
+                  Rezeptseite öffnen → Screenshot machen → hier als Foto importieren.
+                  Funktioniert mit jeder Seite die ein Rezept zeigt.
+                </div>
+              </div>
+
+              {imagePreview && loading && (
+                <div style={{marginTop: '12px'}}>
+                  <div style={{
+                    borderRadius: '12px', overflow: 'hidden',
+                    marginBottom: '10px', position: 'relative'
                   }}>
                     <img src={imagePreview} alt="" style={{
-                      width: '100%', height: '200px', objectFit: 'cover',
-                      display: 'block'
+                      width: '100%', height: '160px',
+                      objectFit: 'cover', display: 'block'
                     }} />
-                    {loading && (
-                      <div style={{
-                        position: 'absolute', inset: 0,
-                        background: 'rgba(0,0,0,0.5)',
-                        display: 'flex', flexDirection: 'column',
-                        alignItems: 'center', justifyContent: 'center', gap: '10px'
-                      }}>
-                        <div style={{fontSize: '32px'}}>🤖</div>
-                        <div style={{
-                          fontSize: '14px', fontWeight: '600', color: '#fff'
-                        }}>
-                          KI analysiert...
-                        </div>
-                        <div style={{fontSize: '12px', color: 'rgba(255,255,255,0.7)'}}>
-                          Erkennt Zutaten und Schritte
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {loading && (
                     <div style={{
-                      padding: '12px 14px',
-                      background: 'var(--color-accent-soft)',
-                      borderRadius: '12px', fontSize: '13px',
-                      color: 'var(--color-accent-text)', textAlign: 'center'
+                      position: 'absolute', inset: 0,
+                      background: 'rgba(0,0,0,0.45)',
+                      display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center', gap: '8px'
                     }}>
-                      Das kann 10-20 Sekunden dauern...
+                      <div style={{
+                        fontSize: '13px', fontWeight: '500', color: '#fff'
+                      }}>
+                        KI analysiert das Bild...
+                      </div>
+                      <div style={{fontSize: '12px', color: 'rgba(255,255,255,0.7)'}}>
+                        Erkennt Zutaten und Schritte
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* URL Tab */}
-          {tab === 'url' && !preview && (
+          {/* Text Tab */}
+          {tab === 'text' && !preview && (
             <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
-              <p style={{fontSize: '13px', color: 'var(--color-text-muted)', lineHeight: '1.5'}}>
-                Rezept-URL eingeben — funktioniert mit lecker.de, essen.de, bbcgoodfood.com und anderen.
+              <p style={{fontSize: '13px', color: 'var(--color-text-muted)', lineHeight: '1.6'}}>
+                Kopiere den Rezepttext von einer Website, Pinterest, einer E-Mail oder
+                tippe ihn ein — die KI extrahiert automatisch alle Zutaten und Schritte.
               </p>
-              <input
-                value={urlInput}
-                onChange={e => setUrlInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleUrlImport()}
-                placeholder="https://www.lecker.de/rezept/..."
+              <textarea
+                value={textInput}
+                onChange={e => setTextInput(e.target.value)}
+                placeholder={'Beispiel:\n\nSpaghetti Carbonara\n\nZutaten:\n200g Spaghetti\n100g Speck\n2 Eier\n...\n\nZubereitung:\n1. Wasser aufkochen...'}
+                rows={10}
                 style={{
-                  width: '100%', padding: '12px 14px',
+                  width: '100%', padding: '12px 13px',
                   background: 'var(--color-surface-2)',
                   border: '0.5px solid var(--color-border)',
-                  borderRadius: '12px', fontSize: '14px',
+                  borderRadius: '12px', fontSize: '13px',
                   color: 'var(--color-text)', outline: 'none',
-                  boxSizing: 'border-box'
+                  resize: 'none', boxSizing: 'border-box', lineHeight: '1.6'
                 }}
               />
               <button
-                onClick={handleUrlImport}
-                disabled={loading || !urlInput.trim()}
+                onClick={handleTextImport}
+                disabled={loading || !textInput.trim()}
                 style={{
-                  padding: '13px', background: 'var(--color-accent)', color: '#fff',
+                  padding: '13px',
+                  background: 'var(--color-accent)', color: '#fff',
                   border: 'none', borderRadius: '12px', cursor: 'pointer',
                   fontSize: '14px', fontWeight: '500',
-                  opacity: loading || !urlInput.trim() ? 0.6 : 1
+                  opacity: loading || !textInput.trim() ? 0.6 : 1
                 }}
               >
-                {loading ? 'Lädt...' : 'Rezept laden'}
+                {loading ? 'KI analysiert...' : 'Rezept erkennen'}
               </button>
 
-              {/* URL fehlgeschlagen — Foto-Fallback Hinweis */}
-              {error === 'url_failed' && (
-                <div style={{
-                  padding: '14px',
-                  background: '#fef3c7',
-                  border: '0.5px solid #fde68a',
-                  borderRadius: '12px'
-                }}>
-                  <div style={{
-                    fontSize: '13px', fontWeight: '600',
-                    color: '#92400e', marginBottom: '6px'
-                  }}>
-                    URL konnte nicht geladen werden
-                  </div>
-                  <div style={{
-                    fontSize: '12px', color: '#92400e',
-                    lineHeight: '1.5', marginBottom: '10px'
-                  }}>
-                    Manche Seiten blockieren automatische Abfragen.
-                    Mach einen Screenshot der Rezeptseite und importiere ihn als Foto —
-                    die KI erkennt das Rezept trotzdem.
-                  </div>
-                  <button
-                    onClick={() => { setTab('foto'); reset() }}
-                    style={{
-                      width: '100%', padding: '10px',
-                      background: '#92400e', color: '#fff',
-                      border: 'none', borderRadius: '8px',
-                      cursor: 'pointer', fontSize: '13px', fontWeight: '500'
-                    }}
-                  >
-                    📷 Als Foto importieren
-                  </button>
+              <div style={{
+                padding: '10px 13px',
+                background: 'var(--color-surface-2)',
+                borderRadius: '10px',
+                border: '0.5px solid var(--color-border)'
+              }}>
+                <div style={{fontSize: '12px', fontWeight: '500', color: 'var(--color-text)', marginBottom: '3px'}}>
+                  Funktioniert mit
                 </div>
-              )}
+                <div style={{fontSize: '12px', color: 'var(--color-text-muted)', lineHeight: '1.5'}}>
+                  Pinterest · Chefkoch · lecker.de · Instagram · Kochbücher · eigene Notizen · und vielem mehr
+                </div>
+              </div>
             </div>
           )}
 
@@ -375,13 +394,13 @@ export default function ImportModal({ onClose }) {
           {tab === 'json' && !preview && (
             <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
               <p style={{fontSize: '13px', color: 'var(--color-text-muted)', lineHeight: '1.5'}}>
-                Rezept als JSON einfügen — z.B. aus einem Export.
+                Rezept als JSON einfügen — für Exporte und technische Nutzer.
               </p>
               <textarea
                 value={jsonInput}
                 onChange={e => setJsonInput(e.target.value)}
                 placeholder='{"name": "Rezeptname", "ingredients": [...], "steps": [...]}'
-                rows={8}
+                rows={10}
                 style={{
                   width: '100%', padding: '12px',
                   background: 'var(--color-surface-2)',
@@ -396,7 +415,8 @@ export default function ImportModal({ onClose }) {
                 onClick={handleJsonImport}
                 disabled={!jsonInput.trim()}
                 style={{
-                  padding: '13px', background: 'var(--color-accent)', color: '#fff',
+                  padding: '13px',
+                  background: 'var(--color-accent)', color: '#fff',
                   border: 'none', borderRadius: '12px', cursor: 'pointer',
                   fontSize: '14px', fontWeight: '500',
                   opacity: !jsonInput.trim() ? 0.6 : 1
@@ -407,12 +427,14 @@ export default function ImportModal({ onClose }) {
             </div>
           )}
 
-          {/* Allgemeiner Fehler */}
-          {error && error !== 'url_failed' && (
+          {/* Fehler */}
+          {error && (
             <div style={{
-              marginTop: '12px', padding: '12px 14px',
-              background: '#fef2f2', border: '0.5px solid #fecaca',
-              borderRadius: '12px', fontSize: '13px', color: '#991b1b'
+              marginTop: '12px', padding: '11px 13px',
+              background: 'var(--color-danger-soft)',
+              border: '0.5px solid var(--color-danger)',
+              borderRadius: '10px', fontSize: '13px',
+              color: 'var(--color-danger)'
             }}>
               {error}
             </div>
@@ -420,24 +442,22 @@ export default function ImportModal({ onClose }) {
 
           {/* Vorschau */}
           {preview && (
-            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
 
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '12px 14px',
-                background: '#f0fdf4', border: '0.5px solid #bbf7d0',
-                borderRadius: '12px'
+                padding: '11px 13px',
+                background: 'var(--color-success-soft)',
+                border: '0.5px solid var(--color-success)',
+                borderRadius: '10px'
               }}>
-                <Check size={18} color="#22c55e" strokeWidth={2.5} />
+                <Check size={16} color="var(--color-success)" strokeWidth={2.5} />
                 <div>
-                  <div style={{fontSize: '13px', fontWeight: '600', color: '#166534'}}>
+                  <div style={{fontSize: '13px', fontWeight: '500', color: 'var(--color-success)'}}>
                     Rezept erkannt
                   </div>
-                  <div style={{
-                    fontSize: '11px', color: '#166534',
-                    opacity: 0.8, marginTop: '1px'
-                  }}>
-                    Prüfe die Daten und speichere das Rezept
+                  <div style={{fontSize: '11px', color: 'var(--color-success)', opacity: 0.8}}>
+                    Prüfe und speichere
                   </div>
                 </div>
               </div>
@@ -445,24 +465,22 @@ export default function ImportModal({ onClose }) {
               {/* Name */}
               <div style={{
                 background: 'var(--color-surface-2)',
-                borderRadius: '12px', padding: '12px 14px',
+                borderRadius: '12px', padding: '11px 13px',
                 border: '0.5px solid var(--color-border)'
               }}>
                 <div style={{
-                  fontSize: '11px', fontWeight: '600',
+                  fontSize: '10px', fontWeight: '500',
                   color: 'var(--color-text-muted)',
                   textTransform: 'uppercase', letterSpacing: '0.5px',
                   marginBottom: '4px'
                 }}>
                   Name
                 </div>
-                <div style={{fontSize: '15px', fontWeight: '600', color: 'var(--color-text)'}}>
+                <div style={{fontSize: '15px', fontWeight: '500', color: 'var(--color-text)'}}>
                   {preview.name || 'Unbekanntes Rezept'}
                 </div>
                 {preview.category && (
-                  <div style={{
-                    fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px'
-                  }}>
+                  <div style={{fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '3px'}}>
                     {preview.category}
                     {preview.servings ? ' · ' + preview.servings + ' Portionen' : ''}
                   </div>
@@ -473,11 +491,11 @@ export default function ImportModal({ onClose }) {
               {preview.ingredients && preview.ingredients.length > 0 && (
                 <div style={{
                   background: 'var(--color-surface-2)',
-                  borderRadius: '12px', padding: '12px 14px',
+                  borderRadius: '12px', padding: '11px 13px',
                   border: '0.5px solid var(--color-border)'
                 }}>
                   <div style={{
-                    fontSize: '11px', fontWeight: '600',
+                    fontSize: '10px', fontWeight: '500',
                     color: 'var(--color-text-muted)',
                     textTransform: 'uppercase', letterSpacing: '0.5px',
                     marginBottom: '8px'
@@ -488,13 +506,13 @@ export default function ImportModal({ onClose }) {
                     {preview.ingredients.map((ing, i) => (
                       <div key={i} style={{
                         display: 'flex', justifyContent: 'space-between',
-                        alignItems: 'center', fontSize: '13px'
+                        alignItems: 'center'
                       }}>
-                        <span style={{color: 'var(--color-text)'}}>{ing.name}</span>
+                        <span style={{fontSize: '13px', color: 'var(--color-text)'}}>
+                          {ing.name}
+                        </span>
                         {(ing.amount || ing.unit) && (
-                          <span style={{
-                            color: 'var(--color-text-muted)', fontSize: '12px'
-                          }}>
+                          <span style={{fontSize: '12px', color: 'var(--color-text-muted)'}}>
                             {ing.amount ? ing.amount + ' ' : ''}{ing.unit || ''}
                           </span>
                         )}
@@ -508,29 +526,27 @@ export default function ImportModal({ onClose }) {
               {preview.steps && preview.steps.length > 0 && (
                 <div style={{
                   background: 'var(--color-surface-2)',
-                  borderRadius: '12px', padding: '12px 14px',
+                  borderRadius: '12px', padding: '11px 13px',
                   border: '0.5px solid var(--color-border)'
                 }}>
                   <div style={{
-                    fontSize: '11px', fontWeight: '600',
+                    fontSize: '10px', fontWeight: '500',
                     color: 'var(--color-text-muted)',
                     textTransform: 'uppercase', letterSpacing: '0.5px',
                     marginBottom: '8px',
                     display: 'flex', alignItems: 'center', gap: '5px'
                   }}>
-                    <ChefHat size={12} />
-                    Zubereitungsschritte ({preview.steps.length})
+                    <ChefHat size={11} />
+                    Schritte ({preview.steps.length})
                   </div>
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '7px'}}>
                     {preview.steps.map((step, i) => (
-                      <div key={i} style={{
-                        display: 'flex', gap: '10px', alignItems: 'flex-start'
-                      }}>
+                      <div key={i} style={{display: 'flex', gap: '8px', alignItems: 'flex-start'}}>
                         <div style={{
-                          width: '20px', height: '20px', borderRadius: '50%',
+                          width: '18px', height: '18px', borderRadius: '50%',
                           background: 'var(--color-accent)', color: '#fff',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '11px', fontWeight: '700',
+                          fontSize: '10px', fontWeight: '600',
                           flexShrink: 0, marginTop: '1px'
                         }}>
                           {i + 1}
@@ -547,14 +563,15 @@ export default function ImportModal({ onClose }) {
                 </div>
               )}
 
-              {/* Keine Schritte Warnung */}
               {(!preview.steps || preview.steps.length === 0) && (
                 <div style={{
-                  padding: '10px 14px',
-                  background: '#fef3c7', border: '0.5px solid #fde68a',
-                  borderRadius: '12px', fontSize: '12px', color: '#92400e'
+                  padding: '10px 13px',
+                  background: 'var(--color-warning-soft)',
+                  border: '0.5px solid var(--color-warning)',
+                  borderRadius: '10px', fontSize: '12px',
+                  color: 'var(--color-warning)'
                 }}>
-                  ⚠️ Keine Zubereitungsschritte erkannt — du kannst sie nach dem Import manuell hinzufügen.
+                  Keine Schritte erkannt — nach dem Import manuell hinzufügen.
                 </div>
               )}
 
@@ -565,7 +582,7 @@ export default function ImportModal({ onClose }) {
                   background: 'var(--color-surface-2)',
                   border: '0.5px solid var(--color-border)',
                   borderRadius: '12px', cursor: 'pointer',
-                  fontSize: '14px', color: 'var(--color-text-muted)'
+                  fontSize: '13px', color: 'var(--color-text-muted)'
                 }}>
                   Neu versuchen
                 </button>
@@ -573,7 +590,7 @@ export default function ImportModal({ onClose }) {
                   flex: 2, padding: '13px',
                   background: 'var(--color-accent)', color: '#fff',
                   border: 'none', borderRadius: '12px', cursor: 'pointer',
-                  fontSize: '14px', fontWeight: '600',
+                  fontSize: '14px', fontWeight: '500',
                   opacity: loading ? 0.7 : 1
                 }}>
                   {loading ? 'Speichert...' : 'Rezept speichern'}
@@ -582,7 +599,6 @@ export default function ImportModal({ onClose }) {
 
             </div>
           )}
-
         </div>
       </div>
     </div>

@@ -1,144 +1,139 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/useAuthStore'
 
 const USERS = [
-  { label: 'Christian', email: 'person1@mealsync.local' },
-  { label: 'Sophie', email: 'person2@mealsync.local' },
+  { email: 'person1@mealsync.local', password: 'mealsync2024', name: 'Person 1' },
+  { email: 'person2@mealsync.local', password: 'mealsync2024', name: 'Person 2' },
 ]
 
 export default function Login() {
-  const [selectedUser, setSelectedUser] = useState(USERS[0])
-  const [password, setPassword] = useState('')
+  const { signIn, loading } = useAuthStore()
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const { signIn } = useAuthStore()
-  const navigate = useNavigate()
+  const [signingIn, setSigningIn] = useState(null)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handleLogin = async (user) => {
+    setSigningIn(user.email)
     setError('')
-    setLoading(true)
     try {
-      await signIn(selectedUser.email, password)
-      navigate('/')
+      await signIn(user.email, user.password)
     } catch (err) {
-      setError('Falsches Passwort')
+      setError('Anmeldung fehlgeschlagen')
     } finally {
-      setLoading(false)
+      setSigningIn(null)
     }
   }
 
   return (
     <div style={{
-      minHeight: '100dvh',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '16px', background: 'var(--color-bg)'
+      minHeight: '100dvh', background: 'var(--color-bg)',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      padding: '32px 24px'
     }}>
-      <div style={{
-        background: 'var(--color-surface)',
-        border: '0.5px solid var(--color-border)',
-        borderRadius: '20px', padding: '32px',
-        width: '100%', maxWidth: '340px'
-      }}>
-        {/* Logo */}
-        <div style={{textAlign: 'center', marginBottom: '32px'}}>
-          <div style={{fontSize: '48px', marginBottom: '12px'}}>🍽️</div>
-          <h1 style={{fontSize: '22px', fontWeight: '500', color: 'var(--color-text)'}}>
-            MealSync
-          </h1>
-          <p style={{fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '4px'}}>
-            Wer bist du?
-          </p>
+
+      {/* Logo */}
+      <div style={{marginBottom: '48px', textAlign: 'center'}}>
+        <div style={{
+          width: '56px', height: '56px', borderRadius: '16px',
+          background: 'var(--color-accent-soft)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 16px'
+        }}>
+          <div style={{
+            width: '26px', height: '26px', borderRadius: '7px',
+            background: 'var(--color-accent)'
+          }} />
         </div>
+        <h1 style={{
+          fontSize: '24px', fontWeight: '600',
+          color: 'var(--color-text)', letterSpacing: '-0.5px',
+          marginBottom: '6px'
+        }}>
+          MealSync
+        </h1>
+        <p style={{fontSize: '14px', color: 'var(--color-text-muted)'}}>
+          Wähle dein Profil
+        </p>
+      </div>
 
-        <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-
-          {/* Nutzer Auswahl */}
-          <div style={{display: 'flex', gap: '8px', marginBottom: '4px'}}>
-            {USERS.map(user => (
-              <button
-                key={user.email}
-                type="button"
-                onClick={() => setSelectedUser(user)}
-                style={{
-                  flex: 1, padding: '14px 8px',
-                  borderRadius: '14px', cursor: 'pointer',
-                  border: selectedUser.email === user.email
-                    ? '2px solid #6c63ff'
-                    : '0.5px solid var(--color-border)',
-                  background: selectedUser.email === user.email
-                    ? 'var(--color-accent-soft)'
-                    : 'var(--color-surface-2)',
-                  transition: 'all 0.15s'
-                }}
-              >
-                <div style={{fontSize: '28px', marginBottom: '6px'}}>
-                  {user.label === 'Person 1' ? '👤' : '👤'}
-                </div>
-                <div style={{
-                  fontSize: '13px', fontWeight: '500',
-                  color: selectedUser.email === user.email
-                    ? 'var(--color-accent-text)'
-                    : 'var(--color-text)'
-                }}>
-                  {user.label}
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* Passwort */}
-          <div>
-            <label style={{
-              display: 'block', fontSize: '13px',
-              color: 'var(--color-text-muted)', marginBottom: '6px'
-            }}>
-              Passwort
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-              autoFocus
-              style={{
-                width: '100%', padding: '11px 14px',
-                background: 'var(--color-input)',
-                border: '0.5px solid var(--color-border)',
-                borderRadius: '10px', fontSize: '14px',
-                color: 'var(--color-text)', outline: 'none'
-              }}
-            />
-          </div>
-
-          {error && (
-            <div style={{
-              padding: '10px 14px', borderRadius: '10px',
-              background: 'var(--color-danger-bg)',
-              color: 'var(--color-danger)', fontSize: '13px'
-            }}>
-              {error}
-            </div>
-          )}
-
+      {/* User Auswahl */}
+      <div style={{
+        width: '100%', maxWidth: '320px',
+        display: 'flex', flexDirection: 'column', gap: '10px'
+      }}>
+        {USERS.map(user => (
           <button
-            type="submit"
-            disabled={loading}
+            key={user.email}
+            onClick={() => handleLogin(user)}
+            disabled={loading || signingIn !== null}
             style={{
-              marginTop: '4px', padding: '13px',
-              background: '#6c63ff', color: '#fff',
-              border: 'none', borderRadius: '12px',
-              fontSize: '15px', fontWeight: '500',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.7 : 1
+              width: '100%', padding: '16px 20px',
+              background: 'var(--color-surface)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: '14px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '14px',
+              transition: 'all 0.15s',
+              opacity: signingIn && signingIn !== user.email ? 0.5 : 1
             }}
           >
-            {loading ? 'Anmelden...' : `Als ${selectedUser.label} anmelden`}
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '50%',
+              background: 'var(--color-accent-soft)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <span style={{
+                fontSize: '16px', fontWeight: '600',
+                color: 'var(--color-accent)'
+              }}>
+                {user.name.charAt(user.name.length - 1)}
+              </span>
+            </div>
+            <div style={{flex: 1, textAlign: 'left'}}>
+              <div style={{
+                fontSize: '15px', fontWeight: '500',
+                color: 'var(--color-text)'
+              }}>
+                {user.name}
+              </div>
+              <div style={{fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px'}}>
+                {signingIn === user.email ? 'Wird angemeldet...' : 'Anmelden'}
+              </div>
+            </div>
+            <div style={{
+              width: '28px', height: '28px', borderRadius: '8px',
+              background: signingIn === user.email
+                ? 'var(--color-accent)'
+                : 'var(--color-surface-2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.15s'
+            }}>
+              <span style={{
+                fontSize: '14px',
+                color: signingIn === user.email ? '#fff' : 'var(--color-text-muted)'
+              }}>
+                →
+              </span>
+            </div>
           </button>
-        </form>
+        ))}
       </div>
+
+      {error && (
+        <p style={{
+          marginTop: '16px', fontSize: '13px',
+          color: 'var(--color-danger)', textAlign: 'center'
+        }}>
+          {error}
+        </p>
+      )}
+
+      <p style={{
+        marginTop: '48px', fontSize: '12px',
+        color: 'var(--color-text-muted)', textAlign: 'center'
+      }}>
+        MealSync · Gemeinsam kochen & planen
+      </p>
     </div>
   )
 }
