@@ -5,11 +5,11 @@ import { usePlanStore } from '../store/usePlanStore'
 import { useRecipeStore } from '../store/useRecipeStore'
 import { useAuthStore } from '../store/useAuthStore'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Plus, X, ChefHat, FileText, Users } from 'lucide-react'
 import { SkeletonPlanDay, SkeletonStyles } from '../components/Skeleton'
+import { ChevronLeft, ChevronRight, Plus, X, ChefHat, FileText, Users } from 'lucide-react'
 
-const DAYS = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
-const DAYS_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+const DAYS = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag']
+const DAYS_SHORT = ['Mo','Di','Mi','Do','Fr','Sa','So']
 
 export default function WeekPlanner() {
   const navigate = useNavigate()
@@ -38,11 +38,10 @@ export default function WeekPlanner() {
   const weekStart = parseISO(currentWeekStart)
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
-  const getEntry = (dayIndex) =>
-    entries.find(e => e.day_of_week === dayIndex + 1 && e.meal_type === 'dinner')
-
-  const getNoteEntry = (dayIndex) =>
-    entries.find(e => e.day_of_week === dayIndex + 1 && e.meal_type === 'note')
+  const getEntry = (i) =>
+    entries.find(e => e.day_of_week === i + 1 && e.meal_type === 'dinner')
+  const getNoteEntry = (i) =>
+    entries.find(e => e.day_of_week === i + 1 && e.meal_type === 'note')
 
   const filtered = recipes.filter(r =>
     r.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -58,511 +57,466 @@ export default function WeekPlanner() {
   const handleSaveNote = async () => {
     const existing = getNoteEntry(activeDay)
     if (existing) await removeEntry(existing.id)
-    if (noteText.trim()) {
-      await addEntry(activeDay + 1, 'note', null, noteText.trim())
-    }
+    if (noteText.trim()) await addEntry(activeDay + 1, 'note', null, noteText.trim())
     setNoteMode(false)
     setNoteText('')
-  }
-
-  const openNoteMode = () => {
-    const existing = getNoteEntry(activeDay)
-    setNoteText(existing?.custom_name || '')
-    setNoteMode(true)
-  }
-
-  const handleServingsChange = async (entry, delta) => {
-    const newServings = Math.max(1, (entry.servings || 2) + delta)
-    await updateServings(entry.id, newServings)
   }
 
   const entry = getEntry(activeDay)
   const noteEntry = getNoteEntry(activeDay)
 
-  // Berechne skalierte Zutaten
-  const getScaledIngredients = (entry) => {
-    if (!entry?.recipes?.ingredients?.length) return []
-    const recipe = entry.recipes
-    const factor = (entry.servings || 2) / (recipe.servings || 2)
-    return recipe.ingredients.map(ing => ({
-      ...ing,
-      amount: ing.amount ? Math.round(ing.amount * factor * 10) / 10 : null
-    }))
-  }
-
   return (
-    <div style={{padding: '16px', paddingBottom: '80px'}}>
+    <div style={{paddingBottom: '80px'}}>
 
-      {/* Wochennavigation */}
+      {/* Header */}
       <div style={{
-        display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', marginBottom: '16px'
+        padding: '16px 16px 0',
+        position: 'sticky', top: 0, zIndex: 10,
+        background: 'var(--color-bg)'
       }}>
-        <button onClick={() => setWeek(addDays(weekStart, -7))} style={{
-          width: '36px', height: '36px', borderRadius: '12px',
-          background: 'var(--color-surface)',
-          border: '0.5px solid var(--color-border)',
-          cursor: 'pointer', display: 'flex',
-          alignItems: 'center', justifyContent: 'center',
-          color: 'var(--color-text-muted)'
+        <div style={{
+          display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', marginBottom: '14px'
         }}>
-          <ChevronLeft size={18} />
-        </button>
-
-        <div style={{textAlign: 'center'}}>
-          <div style={{fontSize: '14px', fontWeight: '500', color: 'var(--color-text)'}}>
-            {format(weekStart, 'd. MMM', { locale: de })} –{' '}
-            {format(addDays(weekStart, 6), 'd. MMM yyyy', { locale: de })}
+          <div>
+            <h1 style={{
+              fontSize: '20px', fontWeight: '600',
+              color: 'var(--color-text)', letterSpacing: '-0.3px'
+            }}>
+              Wochenplan
+            </h1>
+            <p style={{fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '1px'}}>
+              {format(weekStart, 'd. MMM', { locale: de })} –{' '}
+              {format(addDays(weekStart, 6), 'd. MMM', { locale: de })}
+            </p>
           </div>
-          <button onClick={() => {
-            setWeek(new Date())
-            setActiveDay(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1)
-          }} style={{
-            fontSize: '11px', color: 'var(--color-accent)',
-            background: 'none', border: 'none', cursor: 'pointer', marginTop: '2px'
-          }}>
-            Heute
-          </button>
+          <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+            <button onClick={() => setWeek(addDays(weekStart, -7))} style={{
+              width: '30px', height: '30px', borderRadius: '8px',
+              background: 'var(--color-surface)',
+              border: '0.5px solid var(--color-border)',
+              cursor: 'pointer', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              color: 'var(--color-text-muted)'
+            }}>
+              <ChevronLeft size={16} />
+            </button>
+            <button onClick={() => {
+              setWeek(new Date())
+              setActiveDay(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1)
+            }} style={{
+              padding: '5px 10px', borderRadius: '8px',
+              background: 'var(--color-surface)',
+              border: '0.5px solid var(--color-border)',
+              cursor: 'pointer', fontSize: '11px',
+              color: 'var(--color-text-muted)', fontWeight: '500'
+            }}>
+              Heute
+            </button>
+            <button onClick={() => setWeek(addDays(weekStart, 7))} style={{
+              width: '30px', height: '30px', borderRadius: '8px',
+              background: 'var(--color-surface)',
+              border: '0.5px solid var(--color-border)',
+              cursor: 'pointer', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              color: 'var(--color-text-muted)'
+            }}>
+              <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
 
-        <button onClick={() => setWeek(addDays(weekStart, 7))} style={{
-          width: '36px', height: '36px', borderRadius: '12px',
-          background: 'var(--color-surface)',
-          border: '0.5px solid var(--color-border)',
-          cursor: 'pointer', display: 'flex',
-          alignItems: 'center', justifyContent: 'center',
-          color: 'var(--color-text-muted)'
+        {/* Tag-Chips */}
+        <div style={{
+          display: 'flex', gap: '5px',
+          marginBottom: '14px', overflowX: 'auto',
+          scrollbarWidth: 'none', paddingBottom: '2px'
         }}>
-          <ChevronRight size={18} />
-        </button>
+          {weekDays.map((day, i) => {
+            const hasEntry = !!getEntry(i)
+            const hasNote = !!getNoteEntry(i)
+            const isActive = activeDay === i
+            const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+            return (
+              <button key={i} onClick={() => setActiveDay(i)} style={{
+                minWidth: '44px', padding: '7px 5px',
+                borderRadius: '10px', border: 'none',
+                cursor: 'pointer', textAlign: 'center', flexShrink: 0,
+                background: isActive ? 'var(--color-accent)' : 'var(--color-surface)',
+                border: isActive ? 'none' : '0.5px solid var(--color-border)',
+                transition: 'all 0.15s'
+              }}>
+                <span style={{
+                  display: 'block', fontSize: '9px', fontWeight: '500',
+                  color: isActive ? 'rgba(255,255,255,0.65)' : 'var(--color-text-muted)',
+                  letterSpacing: '0.3px', textTransform: 'uppercase'
+                }}>
+                  {DAYS_SHORT[i]}
+                </span>
+                <span style={{
+                  display: 'block', fontSize: '15px', fontWeight: '600',
+                  color: isActive ? '#fff' : isToday ? 'var(--color-accent)' : 'var(--color-text)',
+                  marginTop: '1px'
+                }}>
+                  {format(day, 'd')}
+                </span>
+                <div style={{
+                  display: 'flex', justifyContent: 'center',
+                  gap: '2px', marginTop: '4px', minHeight: '4px'
+                }}>
+                  {hasEntry && (
+                    <div style={{
+                      width: '4px', height: '4px', borderRadius: '50%',
+                      background: isActive ? 'rgba(255,255,255,0.7)' : 'var(--color-accent)'
+                    }} />
+                  )}
+                  {hasNote && (
+                    <div style={{
+                      width: '4px', height: '4px', borderRadius: '50%',
+                      background: isActive ? 'rgba(255,255,255,0.5)' : '#d97706'
+                    }} />
+                  )}
+                </div>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      {/* Tag-Chips */}
-      <div style={{
-        display: 'flex', gap: '6px',
-        marginBottom: '20px', overflowX: 'auto', paddingBottom: '4px'
-      }}>
-        {weekDays.map((day, i) => {
-          const hasEntry = !!getEntry(i)
-          const hasNote = !!getNoteEntry(i)
-          const isActive = activeDay === i
-          const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-          return (
-            <button key={i} onClick={() => setActiveDay(i)} style={{
-              minWidth: '44px', padding: '8px 4px',
-              borderRadius: '14px', border: 'none',
-              cursor: 'pointer', textAlign: 'center', flexShrink: 0,
-              background: isActive ? 'var(--color-accent)' : 'var(--color-surface)',
-              boxShadow: isActive ? '0 2px 8px rgba(88,86,214,0.3)' : 'none',
-              transition: 'all 0.15s'
-            }}>
-              <span style={{
-                display: 'block', fontSize: '10px', fontWeight: '500',
-                color: isActive ? 'rgba(255,255,255,0.7)' : 'var(--color-text-muted)'
-              }}>
-                {DAYS_SHORT[i]}
-              </span>
-              <span style={{
-                display: 'block', fontSize: '15px', fontWeight: '600',
-                color: isActive ? '#fff' : isToday ? 'var(--color-accent)' : 'var(--color-text)',
-                marginTop: '2px'
-              }}>
-                {format(day, 'd')}
-              </span>
-              <div style={{
-                display: 'flex', justifyContent: 'center',
-                gap: '2px', marginTop: '4px'
-              }}>
-                {hasEntry && <div style={{
-                  width: '4px', height: '4px', borderRadius: '50%',
-                  background: isActive ? 'rgba(255,255,255,0.8)' : 'var(--color-accent)'
-                }} />}
-                {hasNote && <div style={{
-                  width: '4px', height: '4px', borderRadius: '50%',
-                  background: isActive ? 'rgba(255,255,255,0.6)' : '#f59e0b'
-                }} />}
-              </div>
-            </button>
-          )
-        })}
-      </div>
+      <div style={{padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '8px'}}>
 
-{loading ? (
-  <>
-    <SkeletonStyles />
-    <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
-      <SkeletonPlanDay />
-      <SkeletonPlanDay />
-    </div>
-  </>
-) : (
-        <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
-
-          {/* Tagesname */}
-          <div style={{
-            fontSize: '13px', fontWeight: '600',
-            color: 'var(--color-text-muted)',
-            textTransform: 'uppercase', letterSpacing: '0.5px'
-          }}>
-            {DAYS[activeDay]}, {format(weekDays[activeDay], 'd. MMMM', { locale: de })}
-          </div>
-
-          {/* Gericht Card */}
-          <div style={{
-            background: 'var(--color-surface)',
-            border: '0.5px solid var(--color-border)',
-            borderRadius: '16px', overflow: 'hidden'
-          }}>
+        {loading ? (
+          <>
+            <SkeletonStyles />
+            <SkeletonPlanDay />
+            <SkeletonPlanDay />
+          </>
+        ) : (
+          <>
+            {/* Tagesname */}
             <div style={{
-              padding: '10px 14px',
-              borderBottom: '0.5px solid var(--color-border)',
-              fontSize: '11px', fontWeight: '600',
+              fontSize: '12px', fontWeight: '500',
               color: 'var(--color-text-muted)',
-              textTransform: 'uppercase', letterSpacing: '0.5px',
-              display: 'flex', alignItems: 'center', gap: '6px'
+              letterSpacing: '0.3px'
             }}>
-              <ChefHat size={12} />
-              Gericht
+              {DAYS[activeDay]}, {format(weekDays[activeDay], 'd. MMMM', { locale: de })}
             </div>
 
-            {entry ? (
-              <div>
-                {/* Gericht Info */}
-                <div style={{
-                  padding: '14px',
-                  display: 'flex', alignItems: 'center', gap: '12px'
+            {/* Gericht Card */}
+            <div style={{
+              background: 'var(--color-surface)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: '14px', overflow: 'hidden'
+            }}>
+              <div style={{
+                padding: '9px 13px',
+                borderBottom: '0.5px solid var(--color-border)',
+                display: 'flex', alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <span style={{
+                  fontSize: '11px', fontWeight: '500',
+                  color: 'var(--color-text-muted)',
+                  textTransform: 'uppercase', letterSpacing: '0.5px'
                 }}>
-                  <div style={{
-                    width: '44px', height: '44px', borderRadius: '12px',
-                    background: 'var(--color-accent-soft)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '22px', flexShrink: 0, overflow: 'hidden'
-                  }}>
-                    {entry.recipes?.image_url
-                      ? <img src={entry.recipes.image_url}
-                          style={{width: '100%', height: '100%', objectFit: 'cover'}} />
-                      : '🍳'}
-                  </div>
-                  <div style={{flex: 1, minWidth: 0}}>
-                    <div style={{
-                      fontWeight: '600', fontSize: '15px', color: 'var(--color-text)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                    }}>
-                      {entry.recipes?.name || entry.custom_name}
-                    </div>
-                    {entry.recipes?.category && (
-                      <div style={{
-                        fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px'
-                      }}>
-                        {entry.recipes.category}
-                      </div>
-                    )}
-                  </div>
-                  <div style={{display: 'flex', gap: '6px'}}>
-                    <button onClick={() => navigate(`/cook/${entry.recipe_id}`)} style={{
-                      padding: '8px 12px',
-                      background: 'var(--color-accent)', color: '#fff',
-                      border: 'none', borderRadius: '10px', cursor: 'pointer',
-                      fontSize: '12px', fontWeight: '500',
-                      display: 'flex', alignItems: 'center', gap: '4px'
-                    }}>
-                      <ChefHat size={13} /> Kochen
-                    </button>
-                    <button onClick={() => removeEntry(entry.id)} style={{
-                      width: '32px', height: '32px',
-                      background: 'var(--color-surface-2)',
-                      border: '0.5px solid var(--color-border)',
-                      borderRadius: '8px', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: 'var(--color-text-muted)'
-                    }}>
-                      <X size={15} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Portionsanpassung */}
-                <div style={{
-                  padding: '10px 14px',
-                  borderTop: '0.5px solid var(--color-border)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-                }}>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: '6px',
-                    fontSize: '13px', color: 'var(--color-text-muted)'
-                  }}>
-                    <Users size={14} />
-                    Portionen
-                    {entry.recipes?.servings && entry.servings !== entry.recipes.servings && (
-                      <span style={{
-                        fontSize: '10px', padding: '1px 6px',
-                        background: 'var(--color-accent-soft)',
-                        color: 'var(--color-accent-text)',
-                        borderRadius: '20px'
-                      }}>
-                        Rezept: {entry.recipes.servings}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                    <button
-                      onClick={() => handleServingsChange(entry, -1)}
-                      style={{
-                        width: '28px', height: '28px', borderRadius: '8px',
-                        background: 'var(--color-surface-2)',
-                        border: '0.5px solid var(--color-border)',
-                        cursor: 'pointer', fontSize: '16px', color: 'var(--color-text)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                      }}
-                    >−</button>
-                    <span style={{
-                      fontSize: '16px', fontWeight: '600',
-                      color: 'var(--color-text)', minWidth: '20px', textAlign: 'center'
-                    }}>
-                      {entry.servings || 2}
-                    </span>
-                    <button
-                      onClick={() => handleServingsChange(entry, +1)}
-                      style={{
-                        width: '28px', height: '28px', borderRadius: '8px',
-                        background: 'var(--color-surface-2)',
-                        border: '0.5px solid var(--color-border)',
-                        cursor: 'pointer', fontSize: '16px', color: 'var(--color-text)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                      }}
-                    >+</button>
-                  </div>
-                </div>
-
-                {/* Skalierte Zutaten */}
-                {getScaledIngredients(entry).length > 0 && (
-                  <div style={{
-                    padding: '10px 14px',
-                    borderTop: '0.5px solid var(--color-border)',
-                    background: 'var(--color-surface-2)'
-                  }}>
-                    <div style={{
-                      fontSize: '11px', fontWeight: '600',
-                      color: 'var(--color-text-muted)',
-                      textTransform: 'uppercase', letterSpacing: '0.5px',
-                      marginBottom: '8px'
-                    }}>
-                      Zutaten für {entry.servings || 2} Portionen
-                      {entry.servings !== entry.recipes?.servings && (
-                        <span style={{
-                          marginLeft: '6px', fontSize: '10px',
-                          color: 'var(--color-accent)', fontWeight: '500',
-                          textTransform: 'none'
-                        }}>
-                          (angepasst)
-                        </span>
-                      )}
-                    </div>
-                    <div style={{display: 'flex', flexWrap: 'wrap', gap: '5px'}}>
-                      {getScaledIngredients(entry).map((ing, i) => (
-                        <span key={i} style={{
-                          fontSize: '12px', padding: '3px 8px',
-                          background: 'var(--color-surface)',
-                          borderRadius: '20px', color: 'var(--color-text-muted)',
-                          border: '0.5px solid var(--color-border)'
-                        }}>
-                          {ing.amount && `${ing.amount} `}
-                          {ing.unit && `${ing.unit} `}
-                          {ing.name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                  Gericht
+                </span>
+                {!entry && (
+                  <button
+                    onClick={() => { setSelectedDay(activeDay); setModal(true) }}
+                    style={{
+                      fontSize: '11px', color: 'var(--color-accent)',
+                      background: 'none', border: 'none',
+                      cursor: 'pointer', fontWeight: '500'
+                    }}
+                  >
+                    + Hinzufügen
+                  </button>
                 )}
               </div>
-            ) : (
-              <button
-                onClick={() => { setSelectedDay(activeDay); setModal(true) }}
-                style={{
-                  width: '100%', padding: '16px',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  gap: '8px', color: 'var(--color-text-muted)', fontSize: '14px'
-                }}
-              >
-                <div style={{
-                  width: '28px', height: '28px', borderRadius: '8px',
-                  background: 'var(--color-accent-soft)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
-                  <Plus size={16} color="var(--color-accent)" />
-                </div>
-                Gericht hinzufügen
-              </button>
-            )}
-          </div>
 
-          {/* Zusatz / Anmerkungen */}
-          <div style={{
-            background: 'var(--color-surface)',
-            border: '0.5px solid var(--color-border)',
-            borderRadius: '16px', overflow: 'hidden'
-          }}>
-            <div style={{
-              padding: '10px 14px',
-              borderBottom: noteEntry || noteMode ? '0.5px solid var(--color-border)' : 'none',
-              fontSize: '11px', fontWeight: '600',
-              color: 'var(--color-text-muted)',
-              textTransform: 'uppercase', letterSpacing: '0.5px',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-            }}>
-              <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
-                <FileText size={12} />
-                Zusatz & Anmerkungen
-              </div>
-              {!noteMode && (
-                <button onClick={openNoteMode} style={{
-                  fontSize: '11px', color: 'var(--color-accent)',
-                  background: 'none', border: 'none', cursor: 'pointer'
+              {entry ? (
+                <>
+                  <div style={{
+                    padding: '12px 13px',
+                    display: 'flex', alignItems: 'center', gap: '10px'
+                  }}>
+                    <div style={{
+                      width: '42px', height: '42px', borderRadius: '10px',
+                      background: 'var(--color-accent-soft)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0, overflow: 'hidden', fontSize: '20px'
+                    }}>
+                      {entry.recipes?.image_url ? (
+                        <img src={entry.recipes.image_url} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                      ) : '🍳'}
+                    </div>
+                    <div style={{flex: 1, minWidth: 0}}>
+                      <div style={{
+                        fontWeight: '500', fontSize: '14px',
+                        color: 'var(--color-text)',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                      }}>
+                        {entry.recipes?.name || entry.custom_name}
+                      </div>
+                      {entry.recipes?.category && (
+                        <div style={{fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px'}}>
+                          {entry.recipes.category}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{display: 'flex', gap: '5px', flexShrink: 0}}>
+                      <button
+                        onClick={() => navigate('/cook/' + entry.recipe_id)}
+                        style={{
+                          padding: '6px 10px',
+                          background: 'var(--color-accent)', color: '#fff',
+                          border: 'none', borderRadius: '8px', cursor: 'pointer',
+                          fontSize: '12px', fontWeight: '500',
+                          display: 'flex', alignItems: 'center', gap: '4px'
+                        }}
+                      >
+                        <ChefHat size={12} /> Kochen
+                      </button>
+                      <button onClick={() => removeEntry(entry.id)} style={{
+                        width: '30px', height: '30px',
+                        background: 'var(--color-surface-2)',
+                        border: '0.5px solid var(--color-border)',
+                        borderRadius: '8px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'var(--color-text-muted)'
+                      }}>
+                        <X size={13} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Portionen */}
+                  <div style={{
+                    padding: '9px 13px',
+                    borderTop: '0.5px solid var(--color-border)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                  }}>
+                    <div style={{
+                      fontSize: '12px', color: 'var(--color-text-muted)',
+                      display: 'flex', alignItems: 'center', gap: '5px'
+                    }}>
+                      <Users size={12} /> Portionen
+                    </div>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                      <button
+                        onClick={() => updateServings(entry.id, Math.max(1, (entry.servings || 2) - 1))}
+                        style={{
+                          width: '24px', height: '24px', borderRadius: '6px',
+                          background: 'var(--color-surface-2)',
+                          border: '0.5px solid var(--color-border)',
+                          cursor: 'pointer', fontSize: '15px',
+                          color: 'var(--color-text)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}
+                      >−</button>
+                      <span style={{
+                        fontSize: '14px', fontWeight: '600',
+                        color: 'var(--color-text)', minWidth: '16px', textAlign: 'center'
+                      }}>
+                        {entry.servings || 2}
+                      </span>
+                      <button
+                        onClick={() => updateServings(entry.id, (entry.servings || 2) + 1)}
+                        style={{
+                          width: '24px', height: '24px', borderRadius: '6px',
+                          background: 'var(--color-surface-2)',
+                          border: '0.5px solid var(--color-border)',
+                          cursor: 'pointer', fontSize: '15px',
+                          color: 'var(--color-text)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}
+                      >+</button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div style={{
+                  padding: '20px 13px',
+                  textAlign: 'center',
+                  color: 'var(--color-text-muted)',
+                  fontSize: '13px'
                 }}>
-                  {noteEntry ? 'Bearbeiten' : '+ Hinzufügen'}
-                </button>
+                  Kein Gericht geplant
+                </div>
               )}
             </div>
 
-            {noteMode ? (
-              <div style={{padding: '12px'}}>
-                <textarea
-                  value={noteText}
-                  onChange={e => setNoteText(e.target.value)}
-                  placeholder="z.B. Beilage: Baguette, ohne Knoblauch..."
-                  rows={3} autoFocus
-                  style={{
-                    width: '100%', padding: '10px 12px',
-                    background: 'var(--color-surface-2)',
-                    border: '0.5px solid var(--color-border)',
-                    borderRadius: '10px', fontSize: '13px',
-                    color: 'var(--color-text)', outline: 'none',
-                    resize: 'none', boxSizing: 'border-box', lineHeight: '1.5'
-                  }}
-                />
-                <div style={{display: 'flex', gap: '8px', marginTop: '8px'}}>
-                  <button onClick={handleSaveNote} style={{
-                    flex: 1, padding: '9px',
-                    background: 'var(--color-accent)', color: '#fff',
-                    border: 'none', borderRadius: '10px',
-                    cursor: 'pointer', fontSize: '13px', fontWeight: '500'
-                  }}>
-                    Speichern
-                  </button>
-                  <button onClick={() => { setNoteMode(false); setNoteText('') }} style={{
-                    padding: '9px 14px',
-                    background: 'var(--color-surface-2)',
-                    border: '0.5px solid var(--color-border)',
-                    borderRadius: '10px', cursor: 'pointer',
-                    fontSize: '13px', color: 'var(--color-text-muted)'
-                  }}>
-                    Abbrechen
-                  </button>
-                </div>
-              </div>
-            ) : noteEntry ? (
-              <div style={{padding: '12px 14px'}}>
-                <p style={{
-                  fontSize: '13px', color: 'var(--color-text)',
-                  lineHeight: '1.5', margin: 0
-                }}>
-                  {noteEntry.custom_name}
-                </p>
-              </div>
-            ) : null}
-          </div>
-
-          {/* Wochenübersicht */}
-          <div style={{marginTop: '8px'}}>
+            {/* Anmerkung */}
             <div style={{
-              fontSize: '11px', fontWeight: '600',
-              color: 'var(--color-text-muted)',
-              textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px'
+              background: 'var(--color-surface)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: '14px', overflow: 'hidden'
             }}>
-              Wochenübersicht
-            </div>
-            {weekDays.map((day, i) => {
-              const e = getEntry(i)
-              const n = getNoteEntry(i)
-              const isActive = activeDay === i
-              return (
-                <div key={i} onClick={() => setActiveDay(i)} style={{
-                  display: 'flex', alignItems: 'center', gap: '10px',
-                  padding: '10px 12px', marginBottom: '4px',
-                  background: isActive ? 'var(--color-accent-soft)' : 'var(--color-surface)',
-                  borderRadius: '12px', cursor: 'pointer',
-                  border: isActive
-                    ? '0.5px solid var(--color-accent)'
-                    : '0.5px solid var(--color-border)',
-                  transition: 'all 0.1s'
+              <div style={{
+                padding: '9px 13px',
+                borderBottom: noteEntry || noteMode ? '0.5px solid var(--color-border)' : 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+              }}>
+                <span style={{
+                  fontSize: '11px', fontWeight: '500',
+                  color: 'var(--color-text-muted)',
+                  textTransform: 'uppercase', letterSpacing: '0.5px',
+                  display: 'flex', alignItems: 'center', gap: '5px'
                 }}>
-                  <span style={{
-                    fontSize: '12px', fontWeight: '600',
-                    color: isActive ? 'var(--color-accent)' : 'var(--color-text-muted)',
-                    width: '26px', flexShrink: 0
-                  }}>
-                    {DAYS_SHORT[i]}
-                  </span>
-                  <div style={{flex: 1, minWidth: 0}}>
-                    <div style={{
-                      fontSize: '13px',
-                      color: e ? 'var(--color-text)' : 'var(--color-text-muted)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                  <FileText size={11} /> Anmerkungen
+                </span>
+                {!noteMode && (
+                  <button
+                    onClick={() => {
+                      setNoteText(noteEntry?.custom_name || '')
+                      setNoteMode(true)
+                    }}
+                    style={{
+                      fontSize: '11px', color: 'var(--color-accent)',
+                      background: 'none', border: 'none',
+                      cursor: 'pointer', fontWeight: '500'
+                    }}
+                  >
+                    {noteEntry ? 'Bearbeiten' : '+ Hinzufügen'}
+                  </button>
+                )}
+              </div>
+
+              {noteMode ? (
+                <div style={{padding: '10px 13px'}}>
+                  <textarea
+                    value={noteText}
+                    onChange={e => setNoteText(e.target.value)}
+                    placeholder="z.B. Beilage: Baguette, ohne Knoblauch..."
+                    rows={2} autoFocus
+                    style={{
+                      width: '100%', padding: '8px 10px',
+                      background: 'var(--color-surface-2)',
+                      border: '0.5px solid var(--color-border)',
+                      borderRadius: '8px', fontSize: '13px',
+                      color: 'var(--color-text)', outline: 'none',
+                      resize: 'none', boxSizing: 'border-box', lineHeight: '1.5'
+                    }}
+                  />
+                  <div style={{display: 'flex', gap: '6px', marginTop: '7px'}}>
+                    <button onClick={handleSaveNote} style={{
+                      flex: 1, padding: '8px',
+                      background: 'var(--color-accent)', color: '#fff',
+                      border: 'none', borderRadius: '8px',
+                      cursor: 'pointer', fontSize: '12px', fontWeight: '500'
                     }}>
-                      {e ? (e.recipes?.name || e.custom_name) : '—'}
-                    </div>
-                    {n && (
-                      <div style={{
-                        fontSize: '11px', color: '#f59e0b',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        marginTop: '1px'
-                      }}>
-                        📝 {n.custom_name}
-                      </div>
-                    )}
+                      Speichern
+                    </button>
+                    <button onClick={() => { setNoteMode(false); setNoteText('') }} style={{
+                      padding: '8px 12px',
+                      background: 'var(--color-surface-2)',
+                      border: '0.5px solid var(--color-border)',
+                      borderRadius: '8px', cursor: 'pointer',
+                      fontSize: '12px', color: 'var(--color-text-muted)'
+                    }}>
+                      Abbrechen
+                    </button>
                   </div>
-                  {e && (
-                    <span style={{
-                      fontSize: '11px', color: 'var(--color-text-muted)',
-                      flexShrink: 0, display: 'flex', alignItems: 'center', gap: '3px'
-                    }}>
-                      <Users size={11} />
-                      {e.servings || 2}
-                    </span>
-                  )}
-                  {!e && (
-                    <span style={{
-                      fontSize: '11px', color: 'var(--color-accent)', flexShrink: 0
-                    }}>
-                      + hinzufügen
-                    </span>
-                  )}
                 </div>
-              )
-            })}
-          </div>
+              ) : noteEntry ? (
+                <div style={{padding: '10px 13px'}}>
+                  <p style={{
+                    fontSize: '13px', color: 'var(--color-text)',
+                    lineHeight: '1.5', margin: 0
+                  }}>
+                    {noteEntry.custom_name}
+                  </p>
+                </div>
+              ) : null}
+            </div>
 
-          {/* PDF Export */}
-          <button onClick={() => window.print()} style={{
-            marginTop: '4px', width: '100%', padding: '11px',
-            background: 'var(--color-surface)',
-            border: '0.5px solid var(--color-border)',
-            borderRadius: '12px', cursor: 'pointer',
-            fontSize: '13px', color: 'var(--color-text-muted)',
-            display: 'flex', alignItems: 'center',
-            justifyContent: 'center', gap: '8px'
-          }}>
-            📄 Wochenplan exportieren
-          </button>
-        </div>
-      )}
+            {/* Wochenübersicht */}
+            <div style={{marginTop: '4px'}}>
+              <div style={{
+                fontSize: '11px', fontWeight: '500',
+                color: 'var(--color-text-muted)',
+                textTransform: 'uppercase', letterSpacing: '0.5px',
+                marginBottom: '7px', padding: '0 2px'
+              }}>
+                Diese Woche
+              </div>
+              <div style={{
+                background: 'var(--color-surface)',
+                border: '0.5px solid var(--color-border)',
+                borderRadius: '14px', overflow: 'hidden'
+              }}>
+                {weekDays.map((day, i) => {
+                  const e = getEntry(i)
+                  const n = getNoteEntry(i)
+                  const isActive = activeDay === i
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => setActiveDay(i)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        padding: '10px 13px',
+                        background: isActive ? 'var(--color-accent-soft)' : 'transparent',
+                        borderTop: i > 0 ? '0.5px solid var(--color-border)' : 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <span style={{
+                        fontSize: '11px', fontWeight: '500',
+                        color: isActive ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                        width: '22px', flexShrink: 0
+                      }}>
+                        {DAYS_SHORT[i]}
+                      </span>
+                      <div style={{flex: 1, minWidth: 0}}>
+                        <div style={{
+                          fontSize: '13px',
+                          color: e ? 'var(--color-text)' : 'var(--color-text-muted)',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          fontWeight: e ? '400' : '400'
+                        }}>
+                          {e ? (e.recipes?.name || e.custom_name) : '—'}
+                        </div>
+                        {n && (
+                          <div style={{
+                            fontSize: '11px', color: '#d97706',
+                            overflow: 'hidden', textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap', marginTop: '1px'
+                          }}>
+                            {n.custom_name}
+                          </div>
+                        )}
+                      </div>
+                      {e ? (
+                        <span style={{
+                          fontSize: '11px', color: 'var(--color-text-muted)',
+                          flexShrink: 0
+                        }}>
+                          {e.servings || 2} P.
+                        </span>
+                      ) : (
+                        <span style={{
+                          fontSize: '11px', color: 'var(--color-accent)',
+                          flexShrink: 0
+                        }}>
+                          +
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
 
-      {/* Rezept-Auswahl Modal */}
+      {/* Rezept-Modal */}
       {modal && (
         <div style={{
           position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.5)', zIndex: 100,
+          background: 'rgba(0,0,0,0.4)', zIndex: 100,
           display: 'flex', alignItems: 'flex-end'
         }}>
           <div style={{
@@ -572,73 +526,69 @@ export default function WeekPlanner() {
             display: 'flex', flexDirection: 'column'
           }}>
             <div style={{
-              padding: '16px',
+              padding: '14px 16px',
               borderBottom: '0.5px solid var(--color-border)',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between'
             }}>
-              <span style={{fontWeight: '600', color: 'var(--color-text)'}}>
-                {DAYS[selectedDay]} — Gericht wählen
+              <span style={{fontWeight: '500', fontSize: '15px', color: 'var(--color-text)'}}>
+                {DAYS[selectedDay]}
               </span>
               <button onClick={() => { setModal(false); setSearch('') }} style={{
-                background: 'none', border: 'none',
-                cursor: 'pointer', fontSize: '22px',
-                color: 'var(--color-text-muted)'
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--color-text-muted)', fontSize: '20px', lineHeight: 1
               }}>×</button>
             </div>
-            <div style={{
-              padding: '12px 16px',
-              borderBottom: '0.5px solid var(--color-border)'
-            }}>
+            <div style={{padding: '10px 14px', borderBottom: '0.5px solid var(--color-border)'}}>
               <input
                 type="text" value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Suchen..." autoFocus
+                placeholder="Rezept suchen..." autoFocus
                 style={{
-                  width: '100%', padding: '10px 14px',
+                  width: '100%', padding: '9px 12px',
                   background: 'var(--color-surface-2)',
                   border: '0.5px solid var(--color-border)',
-                  borderRadius: '10px', fontSize: '14px',
+                  borderRadius: '9px', fontSize: '14px',
                   color: 'var(--color-text)', outline: 'none',
                   boxSizing: 'border-box'
                 }}
               />
             </div>
-            <div style={{overflowY: 'auto', flex: 1, padding: '8px'}}>
+            <div style={{overflowY: 'auto', flex: 1}}>
               {filtered.map(recipe => (
-                <button key={recipe.id} onClick={() => handleSelectRecipe(recipe)} style={{
-                  width: '100%', textAlign: 'left',
-                  padding: '12px', borderRadius: '12px',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '12px'
-                }}>
+                <button
+                  key={recipe.id}
+                  onClick={() => handleSelectRecipe(recipe)}
+                  style={{
+                    width: '100%', textAlign: 'left',
+                    padding: '11px 16px', borderRadius: 0,
+                    background: 'none',
+                    borderBottom: '0.5px solid var(--color-border)',
+                    border: 'none',
+                    borderBottom: '0.5px solid var(--color-border)',
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '10px'
+                  }}
+                >
                   <div style={{
-                    width: '40px', height: '40px', borderRadius: '10px',
+                    width: '36px', height: '36px', borderRadius: '8px',
                     background: 'var(--color-surface-2)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '20px', flexShrink: 0, overflow: 'hidden'
+                    fontSize: '18px', flexShrink: 0, overflow: 'hidden'
                   }}>
                     {recipe.image_url
-                      ? <img src={recipe.image_url}
-                          style={{width: '100%', height: '100%', objectFit: 'cover'}} />
-                      : '🍳'}
+                      ? <img src={recipe.image_url} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                      : '🍳'
+                    }
                   </div>
                   <div style={{flex: 1}}>
-                    <div style={{
-                      fontSize: '14px', fontWeight: '500', color: 'var(--color-text)'
-                    }}>
+                    <div style={{fontSize: '14px', fontWeight: '400', color: 'var(--color-text)'}}>
                       {recipe.name}
                     </div>
-                    <div style={{
-                      fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px',
-                      display: 'flex', gap: '8px'
-                    }}>
-                      {recipe.category && <span>{recipe.category}</span>}
-                      {recipe.servings && (
-                        <span style={{display: 'flex', alignItems: 'center', gap: '3px'}}>
-                          <Users size={10} /> {recipe.servings}
-                        </span>
-                      )}
-                    </div>
+                    {recipe.category && (
+                      <div style={{fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '1px'}}>
+                        {recipe.category}
+                      </div>
+                    )}
                   </div>
                 </button>
               ))}
