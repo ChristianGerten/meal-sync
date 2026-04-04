@@ -5,6 +5,7 @@ import { usePlanStore } from '../store/usePlanStore'
 import { useAuthStore } from '../store/useAuthStore'
 import { supabase } from '../lib/supabase'
 import { SkeletonShoppingGroup, SkeletonStyles } from '../components/Skeleton'
+import { useOfflineSync } from '../hooks/useOfflineSync'
 
 const SUGGESTIONS_SUPERMARKET = [
   // Obst
@@ -360,6 +361,9 @@ export default function ShoppingList() {
     toggleItem, deleteItem, clearChecked,
     getGroupedItems, loading, items, drugstoreItems
   } = useShoppingStore()
+
+  useOfflineSync()
+  const isOffline = useShoppingStore(s => s.isOffline)
 
   const [activeStore, setActiveStore] = useState('supermarket')
   const [newItem, setNewItem] = useState('')
@@ -796,6 +800,26 @@ export default function ShoppingList() {
           </button>
         )}
       </div>
+
+      {/* Offline-Banner ← HIER einfügen */}
+      {isOffline && (
+        <div style={{
+          margin: '0 16px 10px',
+          padding: '10px 14px',
+          background: '#fef3c7',
+          border: '0.5px solid #f59e0b',
+          borderRadius: '10px',
+          display: 'flex', alignItems: 'center', gap: '8px',
+          fontSize: '13px', color: '#92400e'
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#92400e" strokeWidth="2" strokeLinecap="round">
+            <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.56 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>
+          </svg>
+          <span>
+            Offline — Änderungen werden beim nächsten Mal synchronisiert
+          </span>
+        </div>
+      )}
 
       {/* Liste */}
       <div style={{padding: '0 16px'}}>

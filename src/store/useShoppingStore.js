@@ -1,28 +1,20 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
+import {
+  cacheItems,
+  getCachedItems,
+  updateCachedItem,
+  addToSyncQueue
+} from '../lib/offlineDB'
 
 const SUPERMARKET_ORDER = [
-  'Obst & Gemüse',
-  'Fleisch & Fisch',
-  'Kühlregal',
-  'Milchprodukte',
-  'Brot & Backwaren',
-  'Nudeln',
-  'Reis & Getreide',
-  'Konserven',
-  'Gewürze',
-  'Backen',
-  'Getränke',
-  'Tiefkühl',
-  'Sonstiges'
+  'Obst & Gemüse', 'Fleisch & Fisch', 'Kühlregal', 'Milchprodukte',
+  'Brot & Backwaren', 'Nudeln', 'Reis & Getreide', 'Konserven',
+  'Gewürze', 'Backen', 'Getränke', 'Tiefkühl', 'Sonstiges'
 ]
 
 const DRUGSTORE_CATEGORIES = [
-  'Körperpflege',
-  'Haushalt',
-  'Gesundheit',
-  'Baby',
-  'Sonstiges (Drogerie)'
+  'Körperpflege', 'Haushalt', 'Gesundheit', 'Baby', 'Sonstiges (Drogerie)'
 ]
 
 const CATEGORY_MAP = {
@@ -42,24 +34,17 @@ const CATEGORY_MAP = {
   'Sonstiges': 'Sonstiges'
 }
 
-// Erweiterte Basisliste — Gewürze, Öle, Hilfsmittel
 const BASIC_INGREDIENTS = [
-  // Salz & Pfeffer
   'salz', 'pfeffer', 'schwarzer pfeffer', 'weißer pfeffer', 'meersalz',
   'salz und pfeffer', 'pfefferkörner',
-  // Öle & Fette
   'öl', 'olivenöl', 'sonnenblumenöl', 'rapsöl', 'pflanzenöl', 'speiseöl',
   'kokosöl', 'sesamöl', 'butter', 'margarine', 'schmalz',
-  // Essig
   'essig', 'weißweinessig', 'rotweinessig', 'apfelessig', 'balsamico',
   'balsamicoessig',
-  // Zucker & Süßungsmittel
   'zucker', 'brauner zucker', 'puderzucker', 'honig', 'ahornsirup',
   'vanillezucker', 'stevia',
-  // Mehl & Backhilfsmittel
   'mehl', 'weizenmehl', 'backpulver', 'natron', 'speisestärke', 'stärke',
   'hefe', 'trockenhefe',
-  // Gewürze allgemein
   'paprika', 'paprikapulver', 'geräuchertes paprikapulver', 'edelsüß paprika',
   'kurkuma', 'curry', 'currypulver', 'cumin', 'kreuzkümmel',
   'zimt', 'zimt gemahlen', 'muskat', 'muskatnuss',
@@ -69,13 +54,10 @@ const BASIC_INGREDIENTS = [
   'knoblauchpulver', 'zwiebelpulver', 'ingwerpulver',
   'kümmel', 'nelken', 'kardamom', 'sternanis',
   'italienische kräuter', 'herbes de provence', 'ras el hanout',
-  // Wasser
   'wasser', 'mineralwasser',
-  // Senf & Saucen
   'senf', 'dijonsenf', 'mittelscharfer senf',
   'worcestersauce', 'worcestershire sauce', 'sojasauce',
   'tabasco', 'sriracha',
-  // Sonstiges
   'gelatine', 'agar agar', 'xanthan',
 ]
 
@@ -92,70 +74,106 @@ const normalizeCategory = (cat) => CATEGORY_MAP[cat] || cat || 'Sonstiges'
 
 export const useShoppingStore = create((set, get) => ({
   list: null,
+  drugList: null,
   items: [],
   drugstoreItems: [],
   loading: false,
+  isOffline: false,
 
   fetchList: async (householdId, planId) => {
     set({ loading: true })
 
-    // Supermarkt Liste
-    let { data: list } = await supabase
-      .from('shopping_lists')
-      .select()
-      .eq('household_id', householdId)
-      .eq('plan_id', planId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
+    const online = navigator.onLine
 
-    if (!list) {
-      const { data } = await supabase
-        .from('shopping_lists')
-        .insert({ household_id: householdId, plan_id: planId })
-        .select()
-        .single()
-      list = data
+    if (!online) {
+      // Offline: aus IndexedDB laden
+      const cachedItems = await getCachedItems()
+      const superItems = cachedItems.filter(i => i.store === 'supermarket' || !i.store)
+      const drugItems = cachedItems.filter(i => i.store === 'drugstore')
+      set({
+        items: superItems,
+        drugstoreItems: drugItems,
+        loading: false,
+        isOffline: true
+      })
+      return
     }
 
-    const { data: items } = await supabase
-      .from('shopping_items')
-      .select()
-      .eq('list_id', list.id)
-      .eq('store', 'supermarket')
-      .order('category')
-
-    // Drogerie Liste — ohne plan_id
-    let { data: drugList } = await supabase
-      .from('shopping_lists')
-      .select()
-      .eq('household_id', householdId)
-      .eq('plan_id', null)
-      .eq('name', 'Drogerie')
-      .single()
-
-    if (!drugList) {
-      const { data } = await supabase
+    // Online: von Supabase laden
+    try {
+      let { data: list } = await supabase
         .from('shopping_lists')
-        .insert({ household_id: householdId, name: 'Drogerie' })
         .select()
+        .eq('household_id', householdId)
+        .eq('plan_id', planId)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .single()
-      drugList = data
+
+      if (!list) {
+        const { data } = await supabase
+          .from('shopping_lists')
+          .insert({ household_id: householdId, plan_id: planId })
+          .select()
+          .single()
+        list = data
+      }
+
+      const { data: items } = await supabase
+        .from('shopping_items')
+        .select()
+        .eq('list_id', list.id)
+        .order('category')
+
+      let { data: drugList } = await supabase
+        .from('shopping_lists')
+        .select()
+        .eq('household_id', householdId)
+        .is('plan_id', null)
+        .eq('name', 'Drogerie')
+        .single()
+
+      if (!drugList) {
+        const { data } = await supabase
+          .from('shopping_lists')
+          .insert({ household_id: householdId, name: 'Drogerie' })
+          .select()
+          .single()
+        drugList = data
+      }
+
+      const { data: drugItems } = await supabase
+        .from('shopping_items')
+        .select()
+        .eq('list_id', drugList.id)
+        .order('category')
+
+      const allItems = [...(items || []), ...(drugItems || [])]
+
+      // In IndexedDB cachen für Offline-Nutzung
+      await cacheItems(allItems.map(i => ({
+        ...i,
+        store: drugItems?.find(d => d.id === i.id) ? 'drugstore' : 'supermarket'
+      })))
+
+      set({
+        list,
+        drugList,
+        items: items || [],
+        drugstoreItems: drugItems || [],
+        loading: false,
+        isOffline: false
+      })
+    } catch (err) {
+      // Fallback auf Cache
+      const cachedItems = await getCachedItems()
+      set({
+        items: cachedItems.filter(i => i.store !== 'drugstore'),
+        drugstoreItems: cachedItems.filter(i => i.store === 'drugstore'),
+        loading: false,
+        isOffline: true
+      })
     }
-
-    const { data: drugItems } = await supabase
-      .from('shopping_items')
-      .select()
-      .eq('list_id', drugList.id)
-      .order('category')
-
-    set({
-      list,
-      drugList,
-      items: items || [],
-      drugstoreItems: drugItems || [],
-      loading: false
-    })
   },
 
   generateFromPlan: async (entries, householdId, planId) => {
@@ -210,7 +228,9 @@ export const useShoppingStore = create((set, get) => ({
       .eq('list_id', list.id)
       .order('category')
 
-    set({ items: data || [] })
+    const allItems = data || []
+    await cacheItems(allItems.map(i => ({ ...i, store: 'supermarket' })))
+    set({ items: allItems })
   },
 
   addManualItem: async (name, amount, unit, category, store = 'supermarket') => {
@@ -229,40 +249,90 @@ export const useShoppingStore = create((set, get) => ({
       store
     }).select().single()
 
-    if (store === 'drugstore') {
-      set({ drugstoreItems: [...drugstoreItems, data] })
-    } else {
-      set({ items: [...items, data] })
+    if (data) {
+      await cacheItems([data])
+      if (store === 'drugstore') {
+        set({ drugstoreItems: [...drugstoreItems, data] })
+      } else {
+        set({ items: [...items, data] })
+      }
     }
   },
 
+  // Offline-fähiges Abhaken
   toggleItem: async (itemId, checked, store = 'supermarket') => {
-    await supabase.from('shopping_items').update({
-      is_checked: checked,
-      checked_at: checked ? new Date().toISOString() : null
-    }).eq('id', itemId)
-
     const key = store === 'drugstore' ? 'drugstoreItems' : 'items'
+
+    // 1. Sofort im UI und IndexedDB updaten (optimistic)
     set({
       [key]: get()[key].map(i =>
         i.id === itemId ? { ...i, is_checked: checked } : i
       )
     })
+    await updateCachedItem(itemId, { is_checked: checked })
+
+    if (navigator.onLine) {
+      // 2a. Online: direkt zu Supabase
+      try {
+        await supabase
+          .from('shopping_items')
+          .update({
+            is_checked: checked,
+            checked_at: checked ? new Date().toISOString() : null
+          })
+          .eq('id', itemId)
+      } catch (err) {
+        // Supabase fehlgeschlagen → zur Queue
+        await addToSyncQueue({
+          action: 'toggle',
+          item_id: itemId,
+          is_checked: checked
+        })
+      }
+    } else {
+      // 2b. Offline: zur Sync-Queue
+      await addToSyncQueue({
+        action: 'toggle',
+        item_id: itemId,
+        is_checked: checked
+      })
+    }
   },
 
   deleteItem: async (itemId, store = 'supermarket') => {
-    await supabase.from('shopping_items').delete().eq('id', itemId)
     const key = store === 'drugstore' ? 'drugstoreItems' : 'items'
+
+    // Optimistic Update
     set({ [key]: get()[key].filter(i => i.id !== itemId) })
+
+    if (navigator.onLine) {
+      try {
+        await supabase.from('shopping_items').delete().eq('id', itemId)
+      } catch {
+        await addToSyncQueue({ action: 'delete', item_id: itemId })
+      }
+    } else {
+      await addToSyncQueue({ action: 'delete', item_id: itemId })
+    }
   },
 
   clearChecked: async (store = 'supermarket') => {
     const key = store === 'drugstore' ? 'drugstoreItems' : 'items'
     const checked = get()[key].filter(i => i.is_checked)
-    for (const item of checked) {
-      await supabase.from('shopping_items').delete().eq('id', item.id)
-    }
+
     set({ [key]: get()[key].filter(i => !i.is_checked) })
+
+    for (const item of checked) {
+      if (navigator.onLine) {
+        try {
+          await supabase.from('shopping_items').delete().eq('id', item.id)
+        } catch {
+          await addToSyncQueue({ action: 'delete', item_id: item.id })
+        }
+      } else {
+        await addToSyncQueue({ action: 'delete', item_id: item.id })
+      }
+    }
   },
 
   getGroupedItems: (store = 'supermarket', showBasics = false) => {
@@ -295,13 +365,19 @@ export const useShoppingStore = create((set, get) => ({
       const { data } = await supabase
         .from('shopping_items').select()
         .eq('list_id', list.id).order('category')
-      set({ items: data || [] })
+      if (data) {
+        await cacheItems(data.map(i => ({ ...i, store: 'supermarket' })))
+        set({ items: data })
+      }
     }
     if (drugList) {
       const { data } = await supabase
         .from('shopping_items').select()
         .eq('list_id', drugList.id).order('category')
-      set({ drugstoreItems: data || [] })
+      if (data) {
+        await cacheItems(data.map(i => ({ ...i, store: 'drugstore' })))
+        set({ drugstoreItems: data })
+      }
     }
   }
 }))
