@@ -300,21 +300,40 @@ export const useShoppingStore = create((set, get) => ({
   },
 
   deleteItem: async (itemId, store = 'supermarket') => {
-    const key = store === 'drugstore' ? 'drugstoreItems' : 'items'
+  const key = store === 'drugstore' ? 'drugstoreItems' : 'items'
+  const item = get()[key].find(i => i.id === itemId)
 
-    // Optimistic Update
-    set({ [key]: get()[key].filter(i => i.id !== itemId) })
+  // Optimistic Update
+  set({ [key]: get()[key].filter(i => i.id !== itemId) })
 
-    if (navigator.onLine) {
-      try {
-        await supabase.from('shopping_items').delete().eq('id', itemId)
-      } catch {
-        await addToSyncQueue({ action: 'delete', item_id: itemId })
-      }
-    } else {
+  if (navigator.onLine) {
+    try {
+      await supabase.from('shopping_items').delete().eq('id', itemId)
+    } catch {
       await addToSyncQueue({ action: 'delete', item_id: itemId })
     }
-  },
+  } else {
+    await addToSyncQueue({ action: 'delete', item_id: itemId })
+  }
+
+  // Undo nur für manuelle Artikel
+  if (item?.is_manual) {
+    toast.undo(item.name + ' entfernt', async () => {
+      const { data } = await supabase.from('shopping_items').insert({
+        list_id: item.list_id,
+        name: item.name,
+        amount: item.amount,
+        unit: item.unit,
+        category: item.category,
+        is_manual: true,
+        store: item.store || store
+      }).select().single()
+      if (data) {
+        set({ [key]: [...get()[key], data] })
+      }
+    })
+  }
+},
 
   clearChecked: async (store = 'supermarket') => {
     const key = store === 'drugstore' ? 'drugstoreItems' : 'items'

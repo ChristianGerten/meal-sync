@@ -7,12 +7,11 @@ export const useRecipeStore = create((set, get) => ({
   loading: false,
   lastFetched: null,
   householdId: null,
+  _deletedRecipe: null, // für Undo
 
   fetchRecipes: async (householdId, force = false) => {
     const { lastFetched, householdId: cachedId } = get()
     const now = Date.now()
-
-    // Cache: nicht neu laden wenn < 2 Minuten alt und gleicher Haushalt
     if (
       !force &&
       lastFetched &&
@@ -21,8 +20,6 @@ export const useRecipeStore = create((set, get) => ({
     ) return
 
     set({ loading: true })
-
-    // Erst Basis-Daten laden (schnell)
     const { data, error } = await supabase
       .from('recipes')
       .select('id, name, category, tags, image_url, is_favorite, rating, servings, source_url, description, created_at')
@@ -30,21 +27,15 @@ export const useRecipeStore = create((set, get) => ({
       .order('name')
 
     if (!error) {
-      set({
-        recipes: data || [],
-        loading: false,
-        lastFetched: now,
-        householdId
-      })
+      set({ recipes: data || [], loading: false, lastFetched: Date.now(), householdId })
     } else {
       set({ loading: false })
     }
   },
 
-  // Einzelnes Rezept mit allen Details laden (nur bei Bedarf)
   fetchRecipeDetails: async (id) => {
     const existing = get().recipes.find(r => r.id === id)
-    if (existing?.ingredients) return // bereits geladen
+    if (existing?.ingredients) return
 
     const { data } = await supabase
       .from('recipes')
@@ -53,9 +44,7 @@ export const useRecipeStore = create((set, get) => ({
       .single()
 
     if (data) {
-      set({
-        recipes: get().recipes.map(r => r.id === id ? data : r)
-      })
+      set({ recipes: get().recipes.map(r => r.id === id ? data : r) })
     }
   },
 
@@ -148,7 +137,6 @@ export const useRecipeStore = create((set, get) => ({
     const recipe = get().recipes.find(r => r.id === id)
     if (!recipe) return
     const newVal = !recipe.is_favorite
-    // Optimistic Update — sofort im UI ändern
     set({ recipes: get().recipes.map(r => r.id === id ? { ...r, is_favorite: newVal } : r) })
     await supabase.from('recipes').update({ is_favorite: newVal }).eq('id', id)
     toast.success(newVal ? 'Zu Favoriten hinzugefügt' : 'Aus Favoriten entfernt')
@@ -157,27 +145,65 @@ export const useRecipeStore = create((set, get) => ({
   setRating: async (id, rating) => {
     const current = get().recipes.find(r => r.id === id)
     const newRating = current?.rating === rating ? null : rating
-    // Optimistic Update
     set({ recipes: get().recipes.map(r => r.id === id ? { ...r, rating: newRating } : r) })
     await supabase.from('recipes').update({ rating: newRating }).eq('id', id)
-    toast.success(newRating ? `Bewertet mit ${newRating} Sternen` : 'Bewertung entfernt')
+    toast.success(newRating ? 'Bewertet mit ' + newRating + ' Sternen' : 'Bewertung entfernt')
   },
 
   deleteRecipe: async (id, householdId) => {
-    // Optimistic Update
-    set({ recipes: get().recipes.filter(r => r.id !== id) })
+    // Rezept für Undo merken
+    const recipe = get().recipes.find(r => r.id === id)
+    set({
+      recipes: get().recipes.filter(r => r.id !== id),
+      _deletedRecipe: recipe
+    })
+
     const { error } = await supabase.from('recipes').delete().eq('id', id)
     if (error) {
       toast.error('Rezept konnte nicht gelöscht werden')
-      await get().fetchRecipes(householdId, true)
-      throw error
+      set({
+        recipes: [...get().recipes, recipe],
+        _deletedRecipe: null
+      })
+      return
     }
-    toast.success('Rezept gelöscht')
+
+    // Undo-Toast für 5 Sekunden
+    toast.undo(
+      recipe.name + ' gelöscht',
+      async () => {
+        // Undo: Rezept wiederherstellen
+        try {
+          const { data: restored } = await supabase
+            .from('recipes')
+            .insert({
+              name: recipe.name,
+              category: recipe.category,
+              description: recipe.description,
+              servings: recipe.servings,
+              tags: recipe.tags,
+              image_url: recipe.image_url,
+              source_url: recipe.source_url,
+              is_favorite: recipe.is_favorite,
+              rating: recipe.rating,
+              household_id: householdId
+            })
+            .select()
+            .single()
+
+          toast.success(recipe.name + ' wiederhergestellt')
+          get().invalidateCache()
+          await get().fetchRecipes(householdId, true)
+        } catch {
+          toast.error('Wiederherstellen fehlgeschlagen')
+        }
+      }
+    )
   },
 
   uploadImage: async (file, userId) => {
     const ext = file.name.split('.').pop()
-    const path = `${userId}/${Date.now()}.${ext}`
+    const path = userId + '/' + Date.now() + '.' + ext
     const { error } = await supabase.storage
       .from('recipe-images')
       .upload(path, file)

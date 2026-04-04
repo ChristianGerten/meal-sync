@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/useAuthStore'
 import ImportModal from '../components/recipes/ImportModal'
 import { SkeletonRecipeCard, SkeletonStyles } from '../components/Skeleton'
 import { Heart, Star, Search, Plus, SlidersHorizontal } from 'lucide-react'
+import Fuse from 'fuse.js'
 
 const CATEGORIES = [
   'Alle', 'Favoriten', 'Bewertet',
@@ -24,9 +25,7 @@ function StarRating({ rating, onRate, size = 13 }) {
           onMouseLeave={() => setHover(0)}
           style={{
             background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
-            color: star <= (hover || rating || 0)
-              ? '#c1522a'
-              : 'var(--color-border)',
+            color: star <= (hover || rating || 0) ? '#c1522a' : 'var(--color-border)',
             transition: 'color 0.1s'
           }}
         >
@@ -55,21 +54,27 @@ export default function Recipes() {
     if (household) fetchRecipes(household.id)
   }, [household])
 
-  const filtered = recipes
+  const fuse = new Fuse(recipes, {
+    keys: ['name', 'category', 'tags', 'description'],
+    threshold: 0.35,
+    includeScore: true
+  })
+
+  const filtered = (search.trim()
+    ? fuse.search(search).map(r => r.item)
+    : [...recipes]
+  )
     .filter(r => {
-      const matchSearch =
-        r.name.toLowerCase().includes(search.toLowerCase()) ||
-        r.category?.toLowerCase().includes(search.toLowerCase()) ||
-        r.tags?.some(t => t.toLowerCase().includes(search.toLowerCase()))
       const matchCategory =
         activeCategory === 'Alle' ? true :
         activeCategory === 'Favoriten' ? r.is_favorite :
         activeCategory === 'Bewertet' ? r.rating != null :
         r.category?.toLowerCase() === activeCategory.toLowerCase() ||
         r.tags?.some(t => t.toLowerCase() === activeCategory.toLowerCase())
-      return matchSearch && matchCategory
+      return matchCategory
     })
     .sort((a, b) => {
+      if (search.trim()) return 0
       if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0)
       if (sortBy === 'favorites') return (b.is_favorite ? 1 : 0) - (a.is_favorite ? 1 : 0)
       return a.name.localeCompare(b.name)
@@ -80,7 +85,6 @@ export default function Recipes() {
   return (
     <div style={{paddingBottom: '80px'}}>
 
-      {/* Header */}
       <div style={{
         padding: '16px 16px 0',
         position: 'sticky', top: 0, zIndex: 10,
@@ -137,7 +141,9 @@ export default function Recipes() {
                         border: 'none', cursor: 'pointer', fontSize: '13px',
                         color: sortBy === opt.key ? 'var(--color-accent)' : 'var(--color-text)',
                         fontWeight: sortBy === opt.key ? '500' : '400',
-                        borderBottom: idx < arr.length - 1 ? '0.5px solid var(--color-border)' : 'none'
+                        borderBottom: idx < arr.length - 1
+                          ? '0.5px solid var(--color-border)'
+                          : 'none'
                       }}
                     >
                       {opt.label}
@@ -151,8 +157,8 @@ export default function Recipes() {
               width: '34px', height: '34px', borderRadius: '9px',
               background: 'var(--color-surface)',
               border: '0.5px solid var(--color-border)',
-              cursor: 'pointer', fontSize: '16px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
               color: 'var(--color-text-muted)'
             }}>
               <span style={{fontSize: '15px'}}>↓</span>
@@ -170,7 +176,6 @@ export default function Recipes() {
           </div>
         </div>
 
-        {/* Suche */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '8px',
           background: 'var(--color-surface)',
@@ -182,7 +187,7 @@ export default function Recipes() {
           <input
             type="text" value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Suchen..."
+            placeholder="Suchen — auch mit Tippfehlern..."
             style={{
               flex: 1, padding: '10px 0',
               background: 'none', border: 'none',
@@ -198,25 +203,21 @@ export default function Recipes() {
           )}
         </div>
 
-        {/* Kategorien */}
         <div style={{
           display: 'flex', gap: '5px', overflowX: 'auto',
-          paddingBottom: '10px',
-          scrollbarWidth: 'none'
+          paddingBottom: '10px', scrollbarWidth: 'none'
         }}>
           {CATEGORIES.map(cat => (
             <button key={cat} onClick={() => setActiveCategory(cat)} style={{
               padding: '5px 11px', borderRadius: '20px',
-              border: 'none', cursor: 'pointer',
-              fontSize: '12px', fontWeight: activeCategory === cat ? '500' : '400',
+              border: activeCategory === cat ? 'none' : '0.5px solid var(--color-border)',
+              cursor: 'pointer', fontSize: '12px',
+              fontWeight: activeCategory === cat ? '500' : '400',
               whiteSpace: 'nowrap', flexShrink: 0,
               background: activeCategory === cat
                 ? 'var(--color-accent)'
                 : 'var(--color-surface)',
               color: activeCategory === cat ? '#fff' : 'var(--color-text-muted)',
-              border: activeCategory === cat
-                ? 'none'
-                : '0.5px solid var(--color-border)',
               transition: 'all 0.15s'
             }}>
               {cat === 'Favoriten' && favCount > 0
@@ -228,7 +229,6 @@ export default function Recipes() {
         </div>
       </div>
 
-      {/* Grid */}
       <div style={{padding: '0 16px'}}>
         {loading ? (
           <>
@@ -251,16 +251,22 @@ export default function Recipes() {
               fontWeight: '500', fontSize: '15px',
               color: 'var(--color-text)', marginBottom: '6px'
             }}>
-              {activeCategory === 'Favoriten'
-                ? 'Noch keine Favoriten'
-                : 'Keine Rezepte gefunden'}
+              {search
+                ? 'Kein Rezept gefunden'
+                : activeCategory === 'Favoriten'
+                  ? 'Noch keine Favoriten'
+                  : 'Keine Rezepte'
+              }
             </p>
             <p style={{fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '20px'}}>
-              {activeCategory === 'Favoriten'
-                ? 'Tippe das Herz bei einem Rezept an'
-                : 'Füge dein erstes Rezept hinzu'}
+              {search
+                ? 'Versuche einen anderen Suchbegriff'
+                : activeCategory === 'Favoriten'
+                  ? 'Tippe das Herz bei einem Rezept an'
+                  : 'Füge dein erstes Rezept hinzu'
+              }
             </p>
-            {activeCategory !== 'Favoriten' && (
+            {!search && activeCategory !== 'Favoriten' && (
               <button onClick={() => setShowImport(true)} style={{
                 padding: '10px 20px',
                 background: 'var(--color-accent)', color: '#fff',
@@ -284,7 +290,6 @@ export default function Recipes() {
                   cursor: 'pointer'
                 }}
               >
-                {/* Bild */}
                 <div style={{
                   aspectRatio: '4/3', position: 'relative',
                   background: 'var(--color-surface-2)',
@@ -302,9 +307,11 @@ export default function Recipes() {
                     <span style={{opacity: 0.4}}>🍽️</span>
                   )}
 
-                  {/* Favorit */}
                   <button
-                    onClick={e => { e.stopPropagation(); toggleFavorite(recipe.id, household.id) }}
+                    onClick={e => {
+                      e.stopPropagation()
+                      toggleFavorite(recipe.id, household.id)
+                    }}
                     style={{
                       position: 'absolute', top: '7px', right: '7px',
                       width: '26px', height: '26px', borderRadius: '50%',
@@ -312,8 +319,7 @@ export default function Recipes() {
                         ? 'rgba(193,82,42,0.15)'
                         : 'rgba(0,0,0,0.2)',
                       border: 'none', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      transition: 'background 0.15s'
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
                     }}
                   >
                     <Heart
@@ -324,7 +330,6 @@ export default function Recipes() {
                     />
                   </button>
 
-                  {/* Bewertung */}
                   {recipe.rating && (
                     <div style={{
                       position: 'absolute', bottom: '7px', left: '7px',
@@ -340,7 +345,6 @@ export default function Recipes() {
                   )}
                 </div>
 
-                {/* Info */}
                 <div style={{padding: '9px 10px'}}>
                   <div style={{
                     fontWeight: '500', fontSize: '13px',
@@ -364,8 +368,7 @@ export default function Recipes() {
 
                   {recipe.category && (
                     <div style={{
-                      fontSize: '11px', color: 'var(--color-text-muted)',
-                      marginTop: '4px'
+                      fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px'
                     }}>
                       {recipe.category}
                     </div>

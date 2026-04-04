@@ -11,6 +11,7 @@ import ShoppingList from './pages/ShoppingList'
 import CookingMode from './pages/CookingMode'
 import History from './pages/History'
 import Layout from './components/layout/Layout'
+import Settings from './pages/Settings'
 
 function AppRoutes() {
   const { user, household } = useAuthStore()
@@ -112,6 +113,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/*" element={<AppRoutes />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </BrowserRouter>
   )
