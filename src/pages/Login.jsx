@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useAuthStore } from '../store/useAuthStore'
 
 const USERS = [
-  { email: 'person1@mealsync.local', name: 'Person 1' },
-  { email: 'person2@mealsync.local', name: 'Person 2' },
+  { email: 'person1@mealsync.local', password: 'Mealsync', name: 'Person 1' },
+  { email: 'person2@mealsync.local', password: 'MealSync', name: 'Person 2' },
 ]
 
 export default function Login() {
@@ -19,8 +19,7 @@ export default function Login() {
     setError('')
   }
 
-  const handleLogin = async (e) => {
-    e.preventDefault()
+  const handleLogin = async () => {
     if (!selected || !password) return
     setSigningIn(true)
     setError('')
@@ -28,9 +27,12 @@ export default function Login() {
       await signIn(selected.email, password)
     } catch (err) {
       setError('Falsches Passwort')
-    } finally {
       setSigningIn(false)
     }
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleLogin()
   }
 
   return (
@@ -80,8 +82,7 @@ export default function Login() {
                   background: 'var(--color-surface)',
                   border: '0.5px solid var(--color-border)',
                   borderRadius: '14px', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '14px',
-                  transition: 'all 0.15s'
+                  display: 'flex', alignItems: 'center', gap: '14px'
                 }}
               >
                 <div style={{
@@ -104,13 +105,11 @@ export default function Login() {
                   }}>
                     {user.name}
                   </div>
-                  <div style={{
-                    fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px'
-                  }}>
-                    {user.email}
+                  <div style={{fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px'}}>
+                    Anmelden
                   </div>
                 </div>
-                <span style={{color: 'var(--color-text-muted)', fontSize: '18px'}}>›</span>
+                <span style={{color: 'var(--color-text-muted)', fontSize: '20px'}}>›</span>
               </button>
             ))}
           </div>
@@ -118,7 +117,7 @@ export default function Login() {
 
         {/* Schritt 2 — Passwort */}
         {selected && (
-          <form onSubmit={handleLogin} style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
+          <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
 
             {/* Gewählter User */}
             <div style={{
@@ -134,22 +133,16 @@ export default function Login() {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0
               }}>
-                <span style={{
-                  fontSize: '15px', fontWeight: '600', color: 'var(--color-accent)'
-                }}>
+                <span style={{fontSize: '15px', fontWeight: '600', color: 'var(--color-accent)'}}>
                   {selected.name.charAt(selected.name.length - 1)}
                 </span>
               </div>
-              <div style={{flex: 1}}>
+              <div style={{flex: 1, textAlign: 'left'}}>
                 <div style={{fontSize: '14px', fontWeight: '500', color: 'var(--color-text)'}}>
                   {selected.name}
                 </div>
-                <div style={{fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '1px'}}>
-                  {selected.email}
-                </div>
               </div>
               <button
-                type="button"
                 onClick={() => { setSelected(null); setPassword(''); setError('') }}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
@@ -160,22 +153,23 @@ export default function Login() {
               </button>
             </div>
 
-            {/* Passwort */}
+            {/* Passwort Input */}
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="Passwort"
               autoFocus
               style={{
                 width: '100%', padding: '14px 16px',
                 background: 'var(--color-surface)',
                 border: error
-                  ? '0.5px solid var(--color-danger)'
+                  ? '1px solid var(--color-danger)'
                   : '0.5px solid var(--color-border)',
                 borderRadius: '12px', fontSize: '15px',
                 color: 'var(--color-text)', outline: 'none',
-                boxSizing: 'border-box', letterSpacing: '0.1px'
+                boxSizing: 'border-box'
               }}
             />
 
@@ -188,8 +182,9 @@ export default function Login() {
               </p>
             )}
 
+            {/* Login Button */}
             <button
-              type="submit"
+              onClick={handleLogin}
               disabled={signingIn || !password}
               style={{
                 width: '100%', padding: '14px',
@@ -197,14 +192,13 @@ export default function Login() {
                 border: 'none', borderRadius: '12px',
                 cursor: signingIn || !password ? 'not-allowed' : 'pointer',
                 fontSize: '15px', fontWeight: '500',
-                opacity: !password ? 0.6 : 1,
-                transition: 'opacity 0.15s'
+                opacity: !password ? 0.6 : 1
               }}
             >
               {signingIn ? 'Anmelden...' : 'Anmelden'}
             </button>
 
-          </form>
+          </div>
         )}
 
       </div>
