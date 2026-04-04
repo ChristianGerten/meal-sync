@@ -33,26 +33,36 @@ export default function Login() {
     <div style={{
       minHeight: '100dvh',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '16px', background: 'var(--color-bg)'
+      padding: '24px', background: 'var(--color-bg)'
     }}>
-      <div style={{
-        background: 'var(--color-surface)',
-        border: '0.5px solid var(--color-border)',
-        borderRadius: '20px', padding: '32px',
-        width: '100%', maxWidth: '340px'
-      }}>
+      <div style={{width: '100%', maxWidth: '320px'}}>
+
         {/* Logo */}
-        <div style={{textAlign: 'center', marginBottom: '32px'}}>
-          <div style={{fontSize: '48px', marginBottom: '12px'}}>🍽️</div>
-          <h1 style={{fontSize: '22px', fontWeight: '500', color: 'var(--color-text)'}}>
+        <div style={{textAlign: 'center', marginBottom: '40px'}}>
+          <div style={{
+            width: '52px', height: '52px', borderRadius: '14px',
+            background: 'var(--color-accent-soft)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 14px'
+          }}>
+            <div style={{
+              width: '24px', height: '24px', borderRadius: '6px',
+              background: 'var(--color-accent)'
+            }} />
+          </div>
+          <h1 style={{
+            fontSize: '22px', fontWeight: '600',
+            color: 'var(--color-text)', letterSpacing: '-0.3px',
+            marginBottom: '5px'
+          }}>
             MealSync
           </h1>
-          <p style={{fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '4px'}}>
+          <p style={{fontSize: '13px', color: 'var(--color-text-muted)'}}>
             Wer bist du?
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+        <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
 
           {/* Nutzer Auswahl */}
           <div style={{display: 'flex', gap: '8px', marginBottom: '4px'}}>
@@ -65,16 +75,30 @@ export default function Login() {
                   flex: 1, padding: '14px 8px',
                   borderRadius: '14px', cursor: 'pointer',
                   border: selectedUser.email === user.email
-                    ? '2px solid #6c63ff'
+                    ? '1.5px solid var(--color-accent)'
                     : '0.5px solid var(--color-border)',
                   background: selectedUser.email === user.email
                     ? 'var(--color-accent-soft)'
-                    : 'var(--color-surface-2)',
+                    : 'var(--color-surface)',
                   transition: 'all 0.15s'
                 }}
               >
-                <div style={{fontSize: '28px', marginBottom: '6px'}}>
-                  {user.label === 'Person 1' ? '👤' : '👤'}
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  background: selectedUser.email === user.email
+                    ? 'var(--color-accent)'
+                    : 'var(--color-surface-2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  margin: '0 auto 8px'
+                }}>
+                  <span style={{
+                    fontSize: '15px', fontWeight: '600',
+                    color: selectedUser.email === user.email
+                      ? '#fff'
+                      : 'var(--color-text-muted)'
+                  }}>
+                    {user.label.charAt(0)}
+                  </span>
                 </div>
                 <div style={{
                   fontSize: '13px', fontWeight: '500',
@@ -91,8 +115,9 @@ export default function Login() {
           {/* Passwort */}
           <div>
             <label style={{
-              display: 'block', fontSize: '13px',
-              color: 'var(--color-text-muted)', marginBottom: '6px'
+              display: 'block', fontSize: '12px', fontWeight: '500',
+              color: 'var(--color-text-muted)', marginBottom: '6px',
+              textTransform: 'uppercase', letterSpacing: '0.4px'
             }}>
               Passwort
             </label>
@@ -104,19 +129,22 @@ export default function Login() {
               placeholder="••••••••"
               autoFocus
               style={{
-                width: '100%', padding: '11px 14px',
-                background: 'var(--color-input)',
-                border: '0.5px solid var(--color-border)',
-                borderRadius: '10px', fontSize: '14px',
-                color: 'var(--color-text)', outline: 'none'
+                width: '100%', padding: '12px 14px',
+                background: 'var(--color-surface)',
+                border: error
+                  ? '0.5px solid var(--color-danger)'
+                  : '0.5px solid var(--color-border)',
+                borderRadius: '10px', fontSize: '15px',
+                color: 'var(--color-text)', outline: 'none',
+                boxSizing: 'border-box', letterSpacing: '0.05em'
               }}
             />
           </div>
 
           {error && (
             <div style={{
-              padding: '10px 14px', borderRadius: '10px',
-              background: 'var(--color-danger-bg)',
+              padding: '10px 13px', borderRadius: '10px',
+              background: 'var(--color-danger-soft)',
               color: 'var(--color-danger)', fontSize: '13px'
             }}>
               {error}
@@ -125,19 +153,29 @@ export default function Login() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !password}
             style={{
               marginTop: '4px', padding: '13px',
-              background: '#6c63ff', color: '#fff',
+              background: 'var(--color-accent)', color: '#fff',
               border: 'none', borderRadius: '12px',
-              fontSize: '15px', fontWeight: '500',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.7 : 1
+              fontSize: '14px', fontWeight: '500',
+              cursor: loading || !password ? 'not-allowed' : 'pointer',
+              opacity: !password ? 0.6 : 1,
+              transition: 'opacity 0.15s'
             }}
           >
-            {loading ? 'Anmelden...' : `Als ${selectedUser.label} anmelden`}
+            {loading ? 'Anmelden...' : 'Als ' + selectedUser.label + ' anmelden'}
           </button>
+
         </form>
+
+        <p style={{
+          marginTop: '32px', fontSize: '12px',
+          color: 'var(--color-text-muted)', textAlign: 'center'
+        }}>
+          MealSync · Gemeinsam kochen & planen
+        </p>
+
       </div>
     </div>
   )
