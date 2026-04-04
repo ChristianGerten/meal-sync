@@ -10,8 +10,8 @@ import WeekPlanner from './pages/WeekPlanner'
 import ShoppingList from './pages/ShoppingList'
 import CookingMode from './pages/CookingMode'
 import History from './pages/History'
-import Layout from './components/layout/Layout'
 import Settings from './pages/Settings'
+import Layout from './components/layout/Layout'
 
 function AppRoutes() {
   const { user, household } = useAuthStore()
@@ -19,30 +19,21 @@ function AppRoutes() {
 
   if (!user) return <Navigate to="/login" replace />
 
+  // Haushalt noch nicht geladen — nur kurz warten
   if (!household) return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100dvh', background: 'var(--color-bg)',
-      flexDirection: 'column', gap: '12px'
+      height: '100dvh', background: 'var(--color-bg)'
     }}>
       <div style={{
-        width: '52px', height: '52px', borderRadius: '14px',
-        background: 'var(--color-accent-soft)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center'
-      }}>
-        <div style={{
-          width: '24px', height: '24px', borderRadius: '6px',
-          background: 'var(--color-accent)',
-          animation: 'pulse 1.5s ease-in-out infinite'
-        }} />
-      </div>
-      <p style={{color: 'var(--color-text-muted)', fontSize: '14px'}}>
-        Lade Haushalt...
-      </p>
+        width: '6px', height: '6px', borderRadius: '50%',
+        background: 'var(--color-accent)',
+        animation: 'pulse 1s ease-in-out infinite'
+      }} />
       <style>{`
         @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.3; transform: scale(0.8); }
         }
       `}</style>
     </div>
@@ -58,6 +49,7 @@ function AppRoutes() {
         <Route path="/shopping" element={<ShoppingList />} />
         <Route path="/cook/:id" element={<CookingMode />} />
         <Route path="/history" element={<History />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </Layout>
   )
@@ -69,39 +61,23 @@ export default function App() {
 
   useEffect(() => {
     init()
-
-    // Absoluter Fallback: nach 8 Sekunden loading beenden
-    const timeout = setTimeout(() => {
-      useAuthStore.setState({ loading: false })
-    }, 8000)
-
-    return () => clearTimeout(timeout)
   }, [])
 
+  // Nur ganz kurz loading zeigen — max 300ms spürbar
   if (loading) return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100dvh', background: 'var(--color-bg)',
-      flexDirection: 'column', gap: '12px'
+      height: '100dvh', background: 'var(--color-bg)'
     }}>
       <div style={{
-        width: '52px', height: '52px', borderRadius: '14px',
-        background: 'var(--color-accent-soft)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center'
-      }}>
-        <div style={{
-          width: '24px', height: '24px', borderRadius: '6px',
-          background: 'var(--color-accent)',
-          animation: 'pulse 1.5s ease-in-out infinite'
-        }} />
-      </div>
-      <p style={{color: 'var(--color-text-muted)', fontSize: '14px'}}>
-        MealSync lädt...
-      </p>
+        width: '6px', height: '6px', borderRadius: '50%',
+        background: 'var(--color-accent)',
+        animation: 'pulse 1s ease-in-out infinite'
+      }} />
       <style>{`
         @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.3; transform: scale(0.8); }
         }
       `}</style>
     </div>
@@ -113,7 +89,6 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/*" element={<AppRoutes />} />
-        <Route path="/settings" element={<Settings />} />
       </Routes>
     </BrowserRouter>
   )
