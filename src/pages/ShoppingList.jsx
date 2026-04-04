@@ -6,6 +6,217 @@ import { useAuthStore } from '../store/useAuthStore'
 import { supabase } from '../lib/supabase'
 import { SkeletonShoppingGroup, SkeletonStyles } from '../components/Skeleton'
 
+const SUGGESTIONS_SUPERMARKET = [
+  // Obst
+  'Äpfel', 'Bananen', 'Orangen', 'Zitronen', 'Limetten', 'Erdbeeren', 'Himbeeren',
+  'Blaubeeren', 'Brombeeren', 'Trauben', 'Wassermelone', 'Melone', 'Mango',
+  'Ananas', 'Kiwi', 'Pfirsich', 'Nektarine', 'Pflaumen', 'Kirschen', 'Birnen',
+  'Grapefruit', 'Clementinen', 'Mandarine', 'Feigen', 'Datteln', 'Granatapfel',
+  'Papaya', 'Passionsfrucht', 'Kokosnuss', 'Weintrauben',
+
+  // Gemüse
+  'Tomaten', 'Cherrytomaten', 'Paprika', 'Zucchini', 'Gurke', 'Karotten',
+  'Zwiebeln', 'Rote Zwiebeln', 'Frühlingszwiebeln', 'Knoblauch', 'Kartoffeln',
+  'Süßkartoffeln', 'Brokkoli', 'Blumenkohl', 'Spinat', 'Salat', 'Rucola',
+  'Feldsalat', 'Eisbergsalat', 'Champignons', 'Avocado', 'Aubergine',
+  'Lauch', 'Staudensellerie', 'Fenchel', 'Rote Bete', 'Radieschen',
+  'Rettich', 'Kohlrabi', 'Rosenkohl', 'Weißkohl', 'Rotkohl', 'Spitzkohl',
+  'Wirsing', 'Chinakohl', 'Pak Choi', 'Mais', 'Erbsen', 'Bohnen',
+  'Spargel', 'Artischocken', 'Rhabarber', 'Ingwer', 'Chili', 'Jalapeños',
+  'Petersilie', 'Basilikum', 'Schnittlauch', 'Koriander', 'Thymian', 'Rosmarin',
+  'Minze', 'Salbei', 'Dill', 'Estragon',
+
+  // Fleisch
+  'Hähnchenbrust', 'Hähnchenkeule', 'Hähnchenschenkel', 'Ganzes Hähnchen',
+  'Hackfleisch (gemischt)', 'Rinderhack', 'Schweinehack',
+  'Rindersteak', 'Schweinefilet', 'Schweinekotelett', 'Schweinebauch',
+  'Rinderfilet', 'Rinderbraten', 'Lammkotelett', 'Lammhack', 'Lammkeule',
+  'Speck', 'Bauchspeck', 'Schinken', 'Kochschinken', 'Serranoschinken',
+  'Parmaschinken', 'Salami', 'Chorizo', 'Bratwurst', 'Weißwurst',
+  'Wiener Würstchen', 'Leberwurst', 'Truthahn', 'Ente', 'Wildschwein',
+
+  // Fisch & Meeresfrüchte
+  'Lachs', 'Lachsfilet', 'Räucherlachs', 'Thunfisch', 'Thunfisch (Dose)',
+  'Kabeljau', 'Seelachs', 'Forelle', 'Dorade', 'Wolfsbarsch', 'Tilapia',
+  'Sardinen', 'Sardinen (Dose)', 'Hering', 'Makrele', 'Garnelen',
+  'Krabben', 'Muscheln', 'Tintenfisch', 'Jakobsmuscheln', 'Pangasius',
+
+  // Milchprodukte & Kühlregal
+  'Milch', 'Vollmilch', 'Fettarme Milch', 'Laktosefreie Milch', 'Hafermilch',
+  'Mandelmilch', 'Sojamilch', 'Kokosmilch (Kühlregal)', 'Joghurt', 'Naturjoghurt',
+  'Griechischer Joghurt', 'Fruchtjoghurt', 'Quark', 'Magerquark', 'Sahne',
+  'Schlagsahne', 'Saure Sahne', 'Creme fraiche', 'Schmand', 'Butter',
+  'Margarine', 'Eier', 'Bio-Eier', 'Käse', 'Gouda', 'Emmentaler',
+  'Cheddar', 'Mozzarella', 'Büffelmozzarella', 'Parmesan', 'Pecorino',
+  'Feta', 'Brie', 'Camembert', 'Ricotta', 'Mascarpone', 'Frischkäse',
+  'Philadelphia', 'Hüttenkäse', 'Skyr', 'Kefir', 'Buttermilch',
+  'Crème fraîche', 'Pudding', 'Dessert',
+
+  // Brot & Backwaren
+  'Brot', 'Vollkornbrot', 'Weißbrot', 'Sauerteigbrot', 'Dinkelbrot',
+  'Brötchen', 'Vollkornbrötchen', 'Toastbrot', 'Vollkorntoast',
+  'Baguette', 'Ciabatta', 'Laugenbrezeln', 'Croissants', 'Bagels',
+  'Pita-Brot', 'Tortillas', 'Wraps', 'Knäckebrot', 'Zwieback',
+
+  // Nudeln & Getreide
+  'Spaghetti', 'Penne', 'Fusilli', 'Rigatoni', 'Tagliatelle', 'Linguine',
+  'Farfalle', 'Tortellini', 'Lasagneplatten', 'Gnocchi', 'Nudeln (allgemein)',
+  'Vollkornnudeln', 'Reis', 'Basmati-Reis', 'Jasmin-Reis', 'Risotto-Reis',
+  'Vollkornreis', 'Wildreis', 'Couscous', 'Bulgur', 'Quinoa', 'Hirse',
+  'Polenta', 'Haferflocken', 'Müsli', 'Granola', 'Cornflakes',
+  'Paniermehl', 'Semmelbrösel', 'Mehl', 'Speisestärke',
+
+  // Konserven & Gläser
+  'Tomaten (Dose)', 'Geschälte Tomaten', 'Tomatenmark', 'Passata',
+  'Kichererbsen (Dose)', 'Linsen (Dose)', 'Kidneybohnen (Dose)',
+  'Weiße Bohnen (Dose)', 'Mais (Dose)', 'Erbsen (Dose)',
+  'Thunfisch (Dose)', 'Sardinen (Dose)', 'Kokosmilch (Dose)',
+  'Artischockenherzen', 'Oliven', 'Kapern', 'Gürkchen', 'Essiggurken',
+  'Pesto', 'Tomatensauce', 'Bolognese (Glas)', 'Hummus',
+  'Erdnussbutter', 'Mandelmus', 'Marmelade', 'Honig', 'Ahornsirup',
+  'Nutella', 'Senf', 'Ketchup', 'Mayonnaise', 'Sojasauce',
+  'Worcestersauce', 'Tabasco', 'Sriracha', 'Fischsauce',
+
+  // Öle & Essig
+  'Olivenöl', 'Sonnenblumenöl', 'Rapsöl', 'Kokosöl', 'Sesamöl',
+  'Walnussöl', 'Weißweinessig', 'Rotweinessig', 'Balsamico', 'Apfelessig',
+
+  // Getränke
+  'Mineralwasser', 'Stilles Wasser', 'Orangensaft', 'Apfelsaft',
+  'Multivitaminsaft', 'Traubensaft', 'Tomatensaft', 'Limonade',
+  'Cola', 'Fanta', 'Sprite', 'Eistee', 'Kaffee', 'Kaffeebohnen',
+  'Filterkaffee', 'Espresso', 'Tee', 'Grüntee', 'Schwarztee',
+  'Kräutertee', 'Milch (Tetra)', 'Pflanzenmilch', 'Bier', 'Wein',
+  'Rotwein', 'Weißwein', 'Sekt', 'Prosecco',
+
+  // Tiefkühl
+  'Tiefkühlpizza', 'Tiefkühlgemüse', 'Erbsen (TK)', 'Spinat (TK)',
+  'Brokkoli (TK)', 'Blumenkohl (TK)', 'Mais (TK)', 'Bohnen (TK)',
+  'Garnelen (TK)', 'Fischstäbchen', 'Pommes frites', 'Kroketten',
+  'Eis', 'Eiscreme', 'Tiefkühlbeeren', 'Tiefkühlobst',
+
+  // Süßes & Snacks
+  'Schokolade', 'Vollmilchschokolade', 'Zartbitterschokolade',
+  'Weiße Schokolade', 'Kekse', 'Butterkekse', 'Schokokekse',
+  'Chips', 'Salzstangen', 'Nüsse', 'Mandeln', 'Cashews', 'Walnüsse',
+  'Erdnüsse', 'Pistazien', 'Haselnüsse', 'Trockenfrüchte', 'Rosinen',
+  'Müsliriegel', 'Gummibärchen', 'Schokoladenriegel', 'Kaugummi',
+
+  // Backen
+  'Backpulver', 'Natron', 'Vanilleextrakt', 'Vanillezucker', 'Hefe',
+  'Trockenhefe', 'Zucker', 'Puderzucker', 'Brauner Zucker', 'Rohrzucker',
+  'Kakaopulver', 'Schokoladenraspeln', 'Backschokolade', 'Gelatine',
+
+  // Sonstiges
+  'Salz', 'Meersalz', 'Pfeffer', 'Olivenöl (extra vergine)',
+  'Knoblauchzehen', 'Zwiebeln (netz)', 'Kartoffeln (Sack)',
+]
+
+const SUGGESTIONS_DRUGSTORE = [
+  // Haarpflege
+  'Shampoo', 'Conditioner', 'Haarmaske', 'Haarkur', 'Trockenshampoo',
+  'Haarspülung', 'Haaröl', 'Haargel', 'Haarspray', 'Haarmousse',
+  'Haarcreme', 'Haarwachs', 'Haarbürste', 'Kamm', 'Haarnadeln',
+  'Haargummis', 'Haarklammern', 'Haarband', 'Haarfarbe', 'Blondiermittel',
+  'Tönungshampoo', 'Haarpflegespülung', 'Anti-Schuppen-Shampoo',
+  'Pflegeshampoo', 'Volumen-Shampoo', 'Feuchtigkeitsshampoo',
+
+  // Körperpflege
+  'Duschgel', 'Duschcreme', 'Duschschaum', 'Badeschaum', 'Badeöl',
+  'Badezusatz', 'Seife', 'Flüssigseife', 'Handseife', 'Körperlotion',
+  'Bodylotion', 'Körpercreme', 'Körperöl', 'Körperbutter', 'Handcreme',
+  'Handlotion', 'Fußcreme', 'Fußlotion', 'Fußbad', 'Peeling',
+  'Körperpeeling', 'Gesichtspeeling', 'Duschpeeling', 'Waschlappen',
+  'Badeschwamm', 'Luffa', 'Bimsstein', 'Nagelbürste',
+
+  // Gesichtspflege
+  'Gesichtscreme', 'Tagescreme', 'Nachtcreme', 'Augencreme', 'Serum',
+  'Gesichtsserum', 'Gesichtswasser', 'Toner', 'Mizellenwasser',
+  'Gesichtsmaske', 'Reinigungsmilch', 'Gesichtsreinigung', 'Reinigungsgel',
+  'Reinigungsschaum', 'Make-up Entferner', 'Abschminkpads', 'Wattepads',
+  'Feuchtigkeitscreme', 'BB Cream', 'CC Cream', 'Primer', 'Foundation',
+  'Concealer', 'Puder', 'Rouge', 'Bronzer', 'Highlighter', 'Lidschatten',
+  'Eyeliner', 'Mascara', 'Wimperntusche', 'Lippenstift', 'Lipgloss',
+  'Lippenpflege', 'Lipliner', 'Nagellack', 'Nagellackentferner',
+
+  // Sonnenschutz & After Sun
+  'Sonnencreme', 'Sonnenschutzcreme', 'Sonnencreme LSF 30',
+  'Sonnencreme LSF 50', 'Sonnencreme LSF 50+', 'Sonnenspray',
+  'After Sun Lotion', 'After Sun Creme', 'Selbstbräuner',
+  'Sonnenschutzlippe', 'Sonnencreme Kinder',
+
+  // Deodorant & Körperhygiene
+  'Deo', 'Deodorant', 'Deo-Spray', 'Deo-Roll-on', 'Deo-Stick',
+  'Antitranspirant', 'Parfüm', 'Eau de Toilette', 'Eau de Parfum',
+  'Bodyspray', 'Aftershave', 'Rasierklinge', 'Rasierer', 'Nassrasierer',
+  'Rasierschaum', 'Rasiergel', 'Rasierwasser', 'Enthaarungscreme',
+  'Wachsstreifen', 'Intimwaschlotion', 'Intimspray',
+
+  // Mundpflege
+  'Zahnpasta', 'Zahncreme', 'Kinderzahnpasta', 'Whitening Zahnpasta',
+  'Zahnbürste', 'Elektrische Zahnbürste', 'Zahnbürstenköpfe',
+  'Zahnseide', 'Interdentalbürsten', 'Mundspülung', 'Mundwasser',
+  'Zungenschaber', 'Zahnaufhellung', 'Zahnprothesenpfleger',
+
+  // Damenhygiene
+  'Tampons', 'Binden', 'Slipeinlagen', 'Menstruationstasse',
+  'Periodenunterwäsche', 'Intimwaschlotion (Damen)', 'Monatshygiene',
+  'Damenbinden Nacht', 'Ultra-Binden',
+
+  // Babypflege
+  'Windeln', 'Windeln Größe 1', 'Windeln Größe 2', 'Windeln Größe 3',
+  'Windeln Größe 4', 'Windeln Größe 5', 'Feuchttücher', 'Babyfeuchttücher',
+  'Babynahrung', 'Babygläschen', 'Babyshampoo', 'Babyöl', 'Babycreme',
+  'Wundschutzcreme', 'Babypuder', 'Schnuller', 'Flaschen', 'Sauger',
+  'Babymilch', 'Anfangsmilch', 'Folgemiilch', 'Brei', 'Babybrei',
+
+  // Haushalt & Reinigung
+  'Waschmittel', 'Vollwaschmittel', 'Colorwaschmittel', 'Feinwaschmittel',
+  'Flüssigwaschmittel', 'Waschmittelpods', 'Weichspüler',
+  'Fleckentferner', 'Bleichmittel', 'Spülmittel', 'Geschirrspülmittel',
+  'Geschirrspültabs', 'Spülmaschinentabs', 'Klarspüler', 'Maschinenpfleger',
+  'WC-Reiniger', 'WC-Steine', 'WC-Ente', 'Badreiniger', 'Scheuermilch',
+  'Allzweckreiniger', 'Küchenreiniger', 'Glasreiniger', 'Fensterreiniger',
+  'Desinfektionsmittel', 'Desinfektionsspray', 'Handdesinfektionsmittel',
+  'Schimmelentferner', 'Rohrreiniger', 'Kalklöser', 'Entkalker',
+  'Backofenreiniger', 'Grillreiniger', 'Edelstahlpfleger',
+  'Möbelpolitur', 'Bodenpflegemittel', 'Parkettpflege',
+
+  // Papierwaren & Haushaltsbedarf
+  'Toilettenpapier', 'Küchenrolle', 'Taschentücher', 'Papierhandtücher',
+  'Servietten', 'Müllbeutel', 'Müllsäcke', 'Biomüllbeutel',
+  'Frischhaltebeutel', 'Gefrierbeutel', 'Alufolie', 'Frischhaltefolie',
+  'Backpapier', 'Haushaltshandschuhe', 'Einweghandschuhe',
+  'Schwämme', 'Topflappen', 'Geschirrtücher', 'Putztücher',
+  'Mikrofasertücher', 'Schrubber', 'Wischmopp', 'Besen', 'Handfeger',
+  'Staubsaugerbeutel', 'Lufterfrischer', 'Raumspray', 'Duftkerzen',
+
+  // Gesundheit & Medizin
+  'Ibuprofen', 'Paracetamol', 'Aspirin', 'Diclofenac',
+  'Hustensaft', 'Hustendrops', 'Halstabletten', 'Nasenspray',
+  'Meerwasser Nasenspray', 'Nasentropfen', 'Augentropfen',
+  'Ohrentropfen', 'Magentabletten', 'Antazida', 'Abführmittel',
+  'Durchfallmittel', 'Elektrolyte', 'Vitamin C', 'Vitamin D',
+  'Multivitamin', 'Zink', 'Magnesium', 'Omega-3', 'Probiotika',
+  'Melatonin', 'Baldrian', 'Schlaftabletten (pflanzlich)',
+  'Wärmepflaster', 'Kühlpads', 'Kühlspray', 'Wärmflasche',
+  'Pflaster', 'Wundpflaster', 'Wundverband', 'Mullbinden',
+  'Verbandsmull', 'Elastische Binde', 'Desinfektionsmittel (Wunde)',
+  'Betaisodona', 'Bepanthen', 'Wundsalbe', 'Zinksalbe',
+  'Hautcreme (medizinisch)', 'Fußpilzmittel', 'Nagelpilzmittel',
+  'Läusemittel', 'Mückenschutz', 'Mückenspray', 'Mückenarmbänder',
+  'Thermometer', 'Blutdruckmessgerät', 'Fieberthermometer',
+  'Blutzuckermessgerät', 'Teststreifen', 'Kondome', 'Verhütungsmittel',
+  'Schwangerschaftstest',
+
+  // Optik & Kontaktlinsen
+  'Kontaktlinsen', 'Kontaktlinsenpflegemittel', 'Kontaktlinsenbehälter',
+  'Brillenputztuch', 'Brillenreiniger',
+
+  // Haustier
+  'Hundefutter', 'Katzenfutter', 'Tiernahrung', 'Tiersnacks',
+  'Katzenstreu', 'Hundeshampoo', 'Floh- und Zeckenmittel',
+]
 const SUPERMARKET_CATS = [
   'Obst & Gemüse', 'Fleisch & Fisch', 'Kühlregal', 'Milchprodukte',
   'Brot & Backwaren', 'Nudeln', 'Reis & Getreide', 'Konserven',
@@ -54,7 +265,11 @@ function SwipeItem({ item, onToggle, onDelete }) {
           display: 'flex', alignItems: 'center', paddingLeft: '16px'
         }}>
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <polyline points="3,9 7,13 15,5" stroke={item.is_checked ? '#d97706' : '#16a34a'} strokeWidth="2.5" strokeLinecap="round"/>
+            <polyline
+              points="3,9 7,13 15,5"
+              stroke={item.is_checked ? '#d97706' : '#16a34a'}
+              strokeWidth="2.5" strokeLinecap="round"
+            />
           </svg>
         </div>
       )}
@@ -94,7 +309,10 @@ function SwipeItem({ item, onToggle, onDelete }) {
         >
           {item.is_checked && (
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <polyline points="2,6 5,9 10,3" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
+              <polyline
+                points="2,6 5,9 10,3"
+                stroke="#fff" strokeWidth="2.5" strokeLinecap="round"
+              />
             </svg>
           )}
         </button>
@@ -149,6 +367,8 @@ export default function ShoppingList() {
   const [generating, setGenerating] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [showBasics, setShowBasics] = useState(false)
+  const [suggestions, setSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
 
   useEffect(() => {
     if (household && currentPlan) {
@@ -164,7 +384,82 @@ export default function ShoppingList() {
         .select('*, recipes(id, name, servings, ingredients(*))')
         .eq('plan_id', currentPlan.id)
       await generateFromPlan(data || [], household.id, currentPlan.id)
-    } finally { setGenerating(false) }
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const computeSuggestions = (value) => {
+    if (!value.trim() || value.length < 1) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+
+    const lower = value.toLowerCase()
+    const baseList = activeStore === 'drugstore'
+      ? SUGGESTIONS_DRUGSTORE
+      : SUGGESTIONS_SUPERMARKET
+
+    const existingNames = (activeStore === 'drugstore' ? drugstoreItems : items)
+      .map(i => i.name)
+
+    const allSuggestions = [...new Set([...baseList, ...existingNames])]
+
+    const filtered = allSuggestions
+      .filter(s => s.toLowerCase().includes(lower) && s.toLowerCase() !== lower)
+      .slice(0, 6)
+
+    setSuggestions(filtered)
+    setShowSuggestions(filtered.length > 0)
+  }
+
+  const handleSelectSuggestion = (suggestion) => {
+    setNewItem(suggestion)
+    setShowSuggestions(false)
+
+    const lower = suggestion.toLowerCase()
+    if (activeStore === 'supermarket') {
+      if (['äpfel','bananen','orangen','tomaten','paprika','zucchini','gurke',
+           'karotten','zwiebeln','knoblauch','kartoffeln','brokkoli','spinat',
+           'salat','champignons','avocado','erdbeeren','trauben','zitronen'
+          ].some(v => lower.includes(v))) {
+        setNewCategory('Obst & Gemüse')
+      } else if (['hähnchen','hackfleisch','lachs','thunfisch','speck','schinken'
+          ].some(v => lower.includes(v))) {
+        setNewCategory('Fleisch & Fisch')
+      } else if (['milch','joghurt','quark','sahne','eier','käse','mozzarella',
+                  'parmesan','frischkäse','schmand'
+          ].some(v => lower.includes(v))) {
+        setNewCategory('Kühlregal')
+      } else if (['spaghetti','penne','nudel'].some(v => lower.includes(v))) {
+        setNewCategory('Nudeln')
+      } else if (['reis','couscous','quinoa','haferflocken'].some(v => lower.includes(v))) {
+        setNewCategory('Reis & Getreide')
+      } else if (['brot','brötchen','toast','baguette'].some(v => lower.includes(v))) {
+        setNewCategory('Brot & Backwaren')
+      } else if (['dose','kichererbsen','linsen','kidney','kokosmilch'
+          ].some(v => lower.includes(v))) {
+        setNewCategory('Konserven')
+      } else if (['saft','wasser','mineralwasser'].some(v => lower.includes(v))) {
+        setNewCategory('Getränke')
+      }
+    } else {
+      if (['shampoo','conditioner','duschgel','seife','zahnpasta','deo',
+           'bodylotion','gesichtscreme','sonnencreme','rasierschaum'
+          ].some(v => lower.includes(v))) {
+        setNewCategory('Körperpflege')
+      } else if (['waschmittel','weichspüler','spülmittel','reiniger',
+                  'müllbeutel','küchenrolle','toilettenpapier','taschentücher'
+          ].some(v => lower.includes(v))) {
+        setNewCategory('Haushalt')
+      } else if (['ibuprofen','paracetamol','pflaster','nasenspray','hustensaft'
+          ].some(v => lower.includes(v))) {
+        setNewCategory('Gesundheit')
+      } else if (['windeln','feuchttücher','babynahrung'].some(v => lower.includes(v))) {
+        setNewCategory('Baby')
+      }
+    }
   }
 
   const handleAddItem = async () => {
@@ -174,11 +469,15 @@ export default function ShoppingList() {
     setNewItem('')
     setNewCategory('')
     setShowAddForm(false)
+    setShowSuggestions(false)
   }
 
   const groups = getGroupedItems(activeStore, showBasics)
 
-  const allItems = activeStore === 'drugstore' ? drugstoreItems : items.filter(i => showBasics || !isBasicIngredient(i.name))
+  const allItems = activeStore === 'drugstore'
+    ? drugstoreItems
+    : items.filter(i => showBasics || !isBasicIngredient(i.name))
+
   const totalItems = allItems.length
   const checkedItems = allItems.filter(i => i.is_checked).length
   const progressPercent = totalItems > 0 ? Math.round((checkedItems / totalItems) * 100) : 0
@@ -242,19 +541,18 @@ export default function ShoppingList() {
         </div>
 
         {/* Store Tabs */}
-        <div style={{
-          display: 'flex', gap: '6px', marginBottom: '10px'
-        }}>
+        <div style={{display: 'flex', gap: '6px', marginBottom: '10px'}}>
           <button
             onClick={() => setActiveStore('supermarket')}
             style={{
               flex: 1, padding: '9px',
-              borderRadius: '10px', border: 'none', cursor: 'pointer',
+              borderRadius: '10px', cursor: 'pointer',
               background: activeStore === 'supermarket'
                 ? 'var(--color-accent)'
                 : 'var(--color-surface)',
               color: activeStore === 'supermarket' ? '#fff' : 'var(--color-text-muted)',
-              fontSize: '13px', fontWeight: activeStore === 'supermarket' ? '500' : '400',
+              fontSize: '13px',
+              fontWeight: activeStore === 'supermarket' ? '500' : '400',
               border: activeStore === 'supermarket'
                 ? 'none'
                 : '0.5px solid var(--color-border)',
@@ -262,7 +560,7 @@ export default function ShoppingList() {
             }}
           >
             Supermarkt
-            {items.filter(i => !i.is_checked).length > 0 && (
+            {items.filter(i => !i.is_checked && (showBasics || !isBasicIngredient(i.name))).length > 0 && (
               <span style={{
                 marginLeft: '6px', fontSize: '11px',
                 background: activeStore === 'supermarket'
@@ -278,12 +576,11 @@ export default function ShoppingList() {
             onClick={() => setActiveStore('drugstore')}
             style={{
               flex: 1, padding: '9px',
-              borderRadius: '10px', border: 'none', cursor: 'pointer',
-              background: activeStore === 'drugstore'
-                ? '#5F5E5A'
-                : 'var(--color-surface)',
+              borderRadius: '10px', cursor: 'pointer',
+              background: activeStore === 'drugstore' ? '#5F5E5A' : 'var(--color-surface)',
               color: activeStore === 'drugstore' ? '#fff' : 'var(--color-text-muted)',
-              fontSize: '13px', fontWeight: activeStore === 'drugstore' ? '500' : '400',
+              fontSize: '13px',
+              fontWeight: activeStore === 'drugstore' ? '500' : '400',
               border: activeStore === 'drugstore'
                 ? 'none'
                 : '0.5px solid var(--color-border)',
@@ -329,20 +626,82 @@ export default function ShoppingList() {
             marginBottom: '10px',
             display: 'flex', flexDirection: 'column', gap: '7px'
           }}>
-            <input
-              value={newItem}
-              onChange={e => setNewItem(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAddItem()}
-              placeholder="Artikel eingeben..."
-              autoFocus
-              style={{
-                padding: '9px 12px',
-                background: 'var(--color-surface-2)',
-                border: '0.5px solid var(--color-border)',
-                borderRadius: '9px', fontSize: '14px',
-                color: 'var(--color-text)', outline: 'none'
-              }}
-            />
+            <div style={{position: 'relative'}}>
+              <input
+                value={newItem}
+                onChange={e => {
+                  setNewItem(e.target.value)
+                  computeSuggestions(e.target.value)
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { handleAddItem(); setShowSuggestions(false) }
+                  if (e.key === 'Escape') setShowSuggestions(false)
+                }}
+                onFocus={() => newItem.length > 0 && computeSuggestions(newItem)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                placeholder="Artikel eingeben..."
+                autoFocus
+                style={{
+                  width: '100%', padding: '9px 12px',
+                  background: 'var(--color-surface-2)',
+                  border: '0.5px solid var(--color-border)',
+                  borderRadius: showSuggestions ? '9px 9px 0 0' : '9px',
+                  fontSize: '14px', color: 'var(--color-text)',
+                  outline: 'none', boxSizing: 'border-box'
+                }}
+              />
+
+              {showSuggestions && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                  background: 'var(--color-surface)',
+                  border: '0.5px solid var(--color-border)',
+                  borderTop: 'none',
+                  borderRadius: '0 0 9px 9px',
+                  overflow: 'hidden'
+                }}>
+                  {suggestions.map((suggestion, idx) => {
+                    const lower = newItem.toLowerCase()
+                    const sLower = suggestion.toLowerCase()
+                    const matchIdx = sLower.indexOf(lower)
+                    return (
+                      <button
+                        key={suggestion}
+                        onMouseDown={() => handleSelectSuggestion(suggestion)}
+                        style={{
+                          width: '100%', textAlign: 'left',
+                          padding: '10px 12px',
+                          background: 'none', border: 'none',
+                          borderTop: idx > 0
+                            ? '0.5px solid var(--color-border)'
+                            : 'none',
+                          cursor: 'pointer', fontSize: '14px',
+                          color: 'var(--color-text)',
+                          display: 'flex', alignItems: 'center', gap: '8px'
+                        }}
+                      >
+                        <div style={{
+                          width: '6px', height: '6px', borderRadius: '50%',
+                          background: accentColor, flexShrink: 0, opacity: 0.6
+                        }} />
+                        <span>
+                          {matchIdx >= 0 ? (
+                            <>
+                              {suggestion.slice(0, matchIdx)}
+                              <span style={{fontWeight: '600', color: accentColor}}>
+                                {suggestion.slice(matchIdx, matchIdx + newItem.length)}
+                              </span>
+                              {suggestion.slice(matchIdx + newItem.length)}
+                            </>
+                          ) : suggestion}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
             <select
               value={newCategory}
               onChange={e => setNewCategory(e.target.value)}
@@ -351,7 +710,8 @@ export default function ShoppingList() {
                 background: 'var(--color-surface-2)',
                 border: '0.5px solid var(--color-border)',
                 borderRadius: '9px', fontSize: '13px',
-                color: 'var(--color-text)', outline: 'none'
+                color: newCategory ? 'var(--color-text)' : 'var(--color-text-muted)',
+                outline: 'none'
               }}
             >
               <option value="">Kategorie wählen...</option>
@@ -359,17 +719,25 @@ export default function ShoppingList() {
                 <option key={c}>{c}</option>
               ))}
             </select>
+
             <div style={{display: 'flex', gap: '7px'}}>
-              <button onClick={handleAddItem} style={{
-                flex: 1, padding: '9px',
-                background: accentColor, color: '#fff',
-                border: 'none', borderRadius: '9px',
-                cursor: 'pointer', fontSize: '13px', fontWeight: '500'
-              }}>
+              <button
+                onClick={() => { handleAddItem(); setShowSuggestions(false) }}
+                style={{
+                  flex: 1, padding: '9px',
+                  background: accentColor, color: '#fff',
+                  border: 'none', borderRadius: '9px',
+                  cursor: 'pointer', fontSize: '13px', fontWeight: '500'
+                }}
+              >
                 Hinzufügen
               </button>
               <button
-                onClick={() => { setShowAddForm(false); setNewItem('') }}
+                onClick={() => {
+                  setShowAddForm(false)
+                  setNewItem('')
+                  setShowSuggestions(false)
+                }}
                 style={{
                   padding: '9px 12px',
                   background: 'var(--color-surface-2)',
@@ -408,7 +776,7 @@ export default function ShoppingList() {
           </button>
         )}
 
-        {/* Basis-Zutaten Toggle — nur Supermarkt */}
+        {/* Basis-Zutaten Toggle */}
         {activeStore === 'supermarket' && hiddenBasicsCount > 0 && (
           <button
             onClick={() => setShowBasics(s => !s)}
@@ -472,7 +840,6 @@ export default function ShoppingList() {
 
               return (
                 <div key={category}>
-                  {/* Kategorie Label */}
                   <div style={{
                     display: 'flex', alignItems: 'center',
                     justifyContent: 'space-between',
@@ -487,14 +854,11 @@ export default function ShoppingList() {
                     }}>
                       {category}
                     </span>
-                    <span style={{
-                      fontSize: '11px', color: 'var(--color-text-muted)'
-                    }}>
+                    <span style={{fontSize: '11px', color: 'var(--color-text-muted)'}}>
                       {checkedInGroup}/{groupItems.length}
                     </span>
                   </div>
 
-                  {/* Items */}
                   <div style={{
                     background: 'var(--color-surface)',
                     border: '0.5px solid var(--color-border)',
@@ -502,7 +866,6 @@ export default function ShoppingList() {
                     opacity: allGroupDone ? 0.6 : 1,
                     transition: 'opacity 0.3s'
                   }}>
-                    {/* Offene Items zuerst */}
                     {openItems.map((item, idx) => (
                       <div key={item.id} style={{
                         borderTop: idx > 0 ? '0.5px solid var(--color-border)' : 'none'
@@ -515,10 +878,10 @@ export default function ShoppingList() {
                       </div>
                     ))}
 
-                    {/* Erledigte Items darunter mit Trenner */}
                     {doneItems.length > 0 && openItems.length > 0 && (
                       <div style={{height: '0.5px', background: 'var(--color-border)'}} />
                     )}
+
                     {doneItems.map((item, idx) => (
                       <div key={item.id} style={{
                         borderTop: idx > 0 ? '0.5px solid var(--color-border)' : 'none'
@@ -535,7 +898,6 @@ export default function ShoppingList() {
               )
             })}
 
-            {/* Erledigte löschen */}
             {checkedItems > 0 && (
               <button
                 onClick={() => clearChecked(activeStore)}
@@ -554,7 +916,6 @@ export default function ShoppingList() {
               </button>
             )}
 
-            {/* Alles erledigt */}
             {allDone && (
               <div style={{
                 padding: '20px',
