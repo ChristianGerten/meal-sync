@@ -7,14 +7,7 @@ export const useAuthStore = create((set, get) => ({
   loading: true,
 
   init: async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    const user = session?.user ?? null
-    set({ user, loading: false })
-
-    if (user) {
-      await get()._loadOrCreateHousehold(user.id)
-    }
-
+    // Auth State Listener zuerst registrieren
     supabase.auth.onAuthStateChange(async (_event, session) => {
       const user = session?.user ?? null
       set({ user })
@@ -24,6 +17,16 @@ export const useAuthStore = create((set, get) => ({
         set({ household: null })
       }
     })
+
+    // Dann aktuelle Session prüfen
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user ?? null
+    set({ user, loading: false })
+    if (user) {
+      await get()._loadOrCreateHousehold(user.id)
+    } else {
+      set({ loading: false })
+    }
   },
 
   _loadOrCreateHousehold: async (userId) => {
@@ -67,13 +70,15 @@ export const useAuthStore = create((set, get) => ({
   },
 
   signIn: async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
-  },
-
-  signUp: async (email, password) => {
-    const { error } = await supabase.auth.signUp({ email, password })
-    if (error) throw error
+    // Manuell setzen falls onAuthStateChange zu langsam ist
+    const user = data.session?.user ?? null
+    set({ user })
+    if (user) {
+      await get()._loadOrCreateHousehold(user.id)
+    }
+    return data
   },
 
   signOut: async () => {
