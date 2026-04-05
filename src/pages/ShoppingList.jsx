@@ -271,7 +271,7 @@ export default function ShoppingList() {
   const [showBasics, setShowBasics] = useState(false)
   const [suggestions, setSuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [untilDay, setUntilDay] = useState(6)
+  const [selectedDays, setSelectedDays] = useState([0, 1, 2, 3, 4, 5, 6])
 
   useEffect(() => {
     if (household && currentPlan) {
@@ -280,23 +280,26 @@ export default function ShoppingList() {
   }, [household, currentPlan])
 
   const handleGenerate = async () => {
-    setGenerating(true)
-    try {
-      const { data } = await supabase
-        .from('meal_plan_entries')
-        .select('*, recipes(id, name, servings, ingredients(*))')
-        .eq('plan_id', currentPlan.id)
+  setGenerating(true)
+  try {
+    const { data } = await supabase
+      .from('meal_plan_entries')
+      .select('*, recipes(id, name, servings, ingredients(*))')
+      .eq('plan_id', currentPlan.id)
 
-      const filtered = (data || []).filter(e =>
-        e.meal_type === 'dinner' && e.day_of_week <= untilDay + 1
-      )
+    // Nur gewählte Tage — day_of_week ist 1-basiert
+    const filtered = (data || []).filter(e =>
+      e.meal_type === 'dinner' && selectedDays.includes(e.day_of_week - 1)
+    )
 
-      await generateFromPlan(filtered, household.id, currentPlan.id)
-      toast.success('Liste für Mo–' + DAYS_SHORT[untilDay] + ' generiert')
-    } finally {
-      setGenerating(false)
-    }
+    await generateFromPlan(filtered, household.id, currentPlan.id)
+
+    const dayLabels = selectedDays.sort().map(d => DAYS_SHORT[d]).join(', ')
+    toast.success('Liste für ' + dayLabels + ' generiert')
+  } finally {
+    setGenerating(false)
   }
+}
 
   const computeSuggestions = (value) => {
     if (!value.trim()) {
@@ -466,54 +469,49 @@ export default function ShoppingList() {
           )}
         </div>
 
-        {/* Schieberegler */}
-        {activeStore === 'supermarket' && (
-          <div style={{
-            background: 'var(--color-surface)',
-            border: '0.5px solid var(--color-border)',
-            borderRadius: '12px', padding: '10px 14px',
-            marginBottom: '10px'
-          }}>
-            <div style={{
-              display: 'flex', alignItems: 'center',
-              justifyContent: 'space-between', marginBottom: '6px'
-            }}>
-              <span style={{fontSize: '12px', color: 'var(--color-text-muted)'}}>
-                Einkaufen bis einschließlich
-              </span>
-              <span style={{
-                fontSize: '12px', fontWeight: '600',
-                color: 'var(--color-accent)'
-              }}>
-                {DAYS_SHORT[untilDay]}
-              </span>
-            </div>
-            <input
-              type="range"
-              min={0} max={6} step={1}
-              value={untilDay}
-              onChange={e => setUntilDay(Number(e.target.value))}
-              style={{
-                width: '100%', height: '4px',
-                accentColor: 'var(--color-accent)',
-                cursor: 'pointer'
-              }}
-            />
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', marginTop: '4px'
-            }}>
-              {DAYS_SHORT.map((d, i) => (
-                <span key={i} style={{
-                  fontSize: '9px',
-                  color: i <= untilDay ? 'var(--color-accent)' : 'var(--color-text-muted)',
-                  fontWeight: i === untilDay ? '600' : '400'
-                }}>
-                  {d}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Tagesauswahl — nur Supermarkt */}
+{activeStore === 'supermarket' && (
+  <div style={{
+    background: 'var(--color-surface)',
+    border: '0.5px solid var(--color-border)',
+    borderRadius: '12px', padding: '10px 14px',
+    marginBottom: '10px'
+  }}>
+    <div style={{
+      fontSize: '12px', color: 'var(--color-text-muted)',
+      marginBottom: '8px'
+    }}>
+      Für welche Tage einkaufen?
+    </div>
+    <div style={{display: 'flex', gap: '5px'}}>
+      {DAYS_SHORT.map((day, i) => (
+        <button
+          key={i}
+          onClick={() => {
+            setSelectedDays(prev =>
+              prev.includes(i)
+                ? prev.filter(d => d !== i)
+                : [...prev, i]
+            )
+          }}
+          style={{
+            flex: 1, padding: '6px 2px',
+            borderRadius: '8px', border: 'none',
+            cursor: 'pointer', fontSize: '11px',
+            fontWeight: selectedDays.includes(i) ? '600' : '400',
+            background: selectedDays.includes(i)
+              ? 'var(--color-accent)'
+              : 'var(--color-surface-2)',
+            color: selectedDays.includes(i) ? '#fff' : 'var(--color-text-muted)',
+            transition: 'all 0.15s'
+          }}
+        >
+          {day}
+        </button>
+      ))}
+    </div>
+  </div>
+)}
 
         {/* Store Tabs */}
         <div style={{display: 'flex', gap: '6px', marginBottom: '10px'}}>
