@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Plus, RefreshCw, Trash2, EyeOff, Eye, X, Check } from 'lucide-react'
 import { useShoppingStore, isBasicIngredient } from '../store/useShoppingStore'
 import { usePlanStore } from '../store/usePlanStore'
 import { useAuthStore } from '../store/useAuthStore'
@@ -7,7 +7,8 @@ import { supabase } from '../lib/supabase'
 import { toast } from '../components/Toast'
 import { SkeletonShoppingGroup, SkeletonStyles } from '../components/Skeleton'
 import { useOfflineSync } from '../hooks/useOfflineSync'
-
+import { useShoppingRealtime } from '../hooks/useShoppingRealtime'
+import { useWakeLock } from '../hooks/useWakeLock'
 
 const SUGGESTIONS_SUPERMARKET = [
   'Äpfel', 'Bananen', 'Orangen', 'Zitronen', 'Limetten', 'Erdbeeren', 'Himbeeren',
@@ -69,47 +70,24 @@ const SUGGESTIONS_SUPERMARKET = [
 ]
 
 const SUGGESTIONS_DRUGSTORE = [
-  'Shampoo', 'Conditioner', 'Haarmaske', 'Haarkur', 'Trockenshampoo',
-  'Haarspülung', 'Haaröl', 'Haargel', 'Haarspray', 'Haarbürste',
-  'Anti-Schuppen-Shampoo', 'Pflegeshampoo', 'Volumen-Shampoo',
-  'Duschgel', 'Duschcreme', 'Badeschaum', 'Badeöl', 'Seife',
-  'Flüssigseife', 'Handseife', 'Körperlotion', 'Bodylotion',
-  'Körpercreme', 'Körperöl', 'Handcreme', 'Fußcreme', 'Peeling',
+  'Shampoo', 'Conditioner', 'Haarmaske', 'Trockenshampoo', 'Haarspray',
+  'Duschgel', 'Badeschaum', 'Seife', 'Flüssigseife', 'Handseife',
+  'Körperlotion', 'Bodylotion', 'Handcreme', 'Fußcreme', 'Peeling',
   'Gesichtscreme', 'Tagescreme', 'Nachtcreme', 'Augencreme', 'Serum',
-  'Gesichtsserum', 'Mizellenwasser', 'Gesichtsmaske', 'Reinigungsmilch',
-  'Gesichtsreinigung', 'Make-up Entferner', 'Abschminkpads', 'Wattepads',
-  'Feuchtigkeitscreme', 'Foundation', 'Concealer', 'Puder', 'Rouge',
-  'Lidschatten', 'Eyeliner', 'Mascara', 'Lippenstift', 'Lipgloss',
-  'Lippenpflege', 'Nagellack', 'Nagellackentferner',
-  'Sonnencreme', 'Sonnencreme LSF 30', 'Sonnencreme LSF 50',
-  'After Sun Lotion', 'Selbstbräuner',
-  'Deo', 'Deodorant', 'Deo-Spray', 'Deo-Roll-on', 'Deo-Stick',
-  'Antitranspirant', 'Parfüm', 'Eau de Toilette', 'Bodyspray',
-  'Aftershave', 'Rasierschaum', 'Rasiergel', 'Rasierer', 'Rasierklinge',
-  'Zahnpasta', 'Kinderzahnpasta', 'Whitening Zahnpasta',
-  'Zahnbürste', 'Elektrische Zahnbürste', 'Zahnbürstenköpfe',
-  'Zahnseide', 'Interdentalbürsten', 'Mundspülung', 'Mundwasser',
-  'Tampons', 'Binden', 'Slipeinlagen', 'Menstruationstasse',
-  'Windeln', 'Feuchttücher', 'Babyfeuchttücher',
-  'Babynahrung', 'Babyshampoo', 'Babyöl', 'Babycreme', 'Wundschutzcreme',
-  'Waschmittel', 'Vollwaschmittel', 'Colorwaschmittel', 'Feinwaschmittel',
-  'Flüssigwaschmittel', 'Waschmittelpods', 'Weichspüler', 'Fleckentferner',
-  'Spülmittel', 'Geschirrspültabs', 'Spülmaschinentabs', 'Klarspüler',
-  'WC-Reiniger', 'WC-Steine', 'Badreiniger', 'Scheuermilch',
-  'Allzweckreiniger', 'Küchenreiniger', 'Glasreiniger',
-  'Desinfektionsmittel', 'Desinfektionsspray', 'Handdesinfektionsmittel',
-  'Entkalker', 'Backofenreiniger', 'Rohrreiniger',
-  'Toilettenpapier', 'Küchenrolle', 'Taschentücher', 'Servietten',
-  'Müllbeutel', 'Müllsäcke', 'Biomüllbeutel', 'Frischhaltebeutel',
-  'Gefrierbeutel', 'Alufolie', 'Frischhaltefolie', 'Backpapier',
-  'Haushaltshandschuhe', 'Schwämme', 'Mikrofasertücher', 'Putztücher',
-  'Ibuprofen', 'Paracetamol', 'Aspirin', 'Hustensaft', 'Hustendrops',
-  'Halstabletten', 'Nasenspray', 'Augentropfen', 'Magentabletten',
-  'Vitamin C', 'Vitamin D', 'Multivitamin', 'Zink', 'Magnesium', 'Omega-3',
-  'Pflaster', 'Wundverband', 'Mullbinden', 'Wundsalbe', 'Bepanthen',
-  'Thermometer', 'Kondome', 'Schwangerschaftstest',
-  'Kontaktlinsen', 'Kontaktlinsenpflegemittel',
-  'Hundefutter', 'Katzenfutter', 'Tiersnacks', 'Katzenstreu',
+  'Mizellenwasser', 'Gesichtsmaske', 'Make-up Entferner', 'Wattepads',
+  'Foundation', 'Concealer', 'Mascara', 'Lippenstift', 'Lippenpflege',
+  'Nagellack', 'Nagellackentferner', 'Sonnencreme LSF 30', 'Sonnencreme LSF 50',
+  'Deo', 'Deo-Spray', 'Deo-Roll-on', 'Parfüm', 'Aftershave',
+  'Rasierschaum', 'Rasierer', 'Rasierklinge',
+  'Zahnpasta', 'Zahnbürste', 'Zahnseide', 'Mundspülung',
+  'Tampons', 'Binden', 'Slipeinlagen', 'Windeln', 'Feuchttücher',
+  'Babynahrung', 'Babyshampoo', 'Babycreme',
+  'Waschmittel', 'Weichspüler', 'Spülmittel', 'Geschirrspültabs',
+  'WC-Reiniger', 'Allzweckreiniger', 'Glasreiniger', 'Desinfektionsmittel',
+  'Toilettenpapier', 'Küchenrolle', 'Taschentücher', 'Müllbeutel',
+  'Alufolie', 'Frischhaltefolie', 'Backpapier', 'Schwämme',
+  'Ibuprofen', 'Paracetamol', 'Hustensaft', 'Nasenspray', 'Pflaster',
+  'Vitamin C', 'Vitamin D', 'Magnesium', 'Omega-3',
 ]
 
 const SUPERMARKET_CATS = [
@@ -125,7 +103,7 @@ const DRUGSTORE_CATS = [
 const UNITS = ['g', 'kg', 'ml', 'l', 'Stück', 'Packung', 'Dose', 'Flasche', 'Bund', 'EL', 'TL', 'Prise']
 const DAYS_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 
-function SwipeItem({ item, onToggle, onDelete, accentColor }) {
+function SwipeItem({ item, onToggle, onDelete }) {
   const startX = useRef(null)
   const [offsetX, setOffsetX] = useState(0)
   const isDragging = useRef(false)
@@ -162,12 +140,10 @@ function SwipeItem({ item, onToggle, onDelete, accentColor }) {
           background: item.is_checked ? '#fef3c7' : '#f0fdf4',
           display: 'flex', alignItems: 'center', paddingLeft: '16px'
         }}>
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <polyline
-              points="3,9 7,13 15,5"
+          <svg width="20" height="20" viewBox="0 0 18 18" fill="none">
+            <polyline points="3,9 7,13 15,5"
               stroke={item.is_checked ? '#d97706' : '#16a34a'}
-              strokeWidth="2.5" strokeLinecap="round"
-            />
+              strokeWidth="2.5" strokeLinecap="round"/>
           </svg>
         </div>
       )}
@@ -177,7 +153,7 @@ function SwipeItem({ item, onToggle, onDelete, accentColor }) {
           display: 'flex', alignItems: 'center',
           justifyContent: 'flex-end', paddingRight: '16px'
         }}>
-          <Trash2 size={16} color="#dc2626" />
+          <Trash2 size={18} color="#dc2626" />
         </div>
       )}
 
@@ -186,37 +162,36 @@ function SwipeItem({ item, onToggle, onDelete, accentColor }) {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         style={{
-          display: 'flex', alignItems: 'center', gap: '12px',
-          padding: '13px 14px',
+          display: 'flex', alignItems: 'center', gap: '14px',
+          padding: '14px 14px',
           background: 'var(--color-surface)',
           transform: 'translateX(' + offsetX + 'px)',
           transition: isDragging.current ? 'none' : 'transform 0.2s ease',
           userSelect: 'none'
         }}
       >
+        {/* 32px Checkbox */}
         <button
           onClick={() => onToggle(!item.is_checked)}
           style={{
-            width: '24px', height: '24px', borderRadius: '50%',
+            width: '32px', height: '32px', borderRadius: '50%',
             border: item.is_checked ? 'none' : '1.5px solid var(--color-border)',
-            background: item.is_checked ? accentColor : 'transparent',
+            background: item.is_checked ? '#c1522a' : 'transparent',
             cursor: 'pointer', flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             transition: 'all 0.15s'
           }}
         >
           {item.is_checked && (
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <polyline
-                points="2,6 5,9 10,3"
-                stroke="#fff" strokeWidth="2.5" strokeLinecap="round"
-              />
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <polyline points="2,7 6,11 12,3"
+                stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
             </svg>
           )}
         </button>
 
         <span style={{
-          flex: 1, fontSize: '15px',
+          flex: 1, fontSize: '16px',
           color: item.is_checked ? 'var(--color-text-muted)' : 'var(--color-text)',
           textDecoration: item.is_checked ? 'line-through' : 'none',
           transition: 'all 0.15s'
@@ -226,7 +201,7 @@ function SwipeItem({ item, onToggle, onDelete, accentColor }) {
 
         {(item.amount || item.unit) && (
           <span style={{
-            fontSize: '13px', fontWeight: '500',
+            fontSize: '14px', fontWeight: '500',
             color: 'var(--color-text-muted)', flexShrink: 0
           }}>
             {formatAmount(item.amount)}{item.unit ? ' ' + item.unit : ''}
@@ -234,17 +209,361 @@ function SwipeItem({ item, onToggle, onDelete, accentColor }) {
         )}
 
         {item.is_manual && (
-          <button
-            onClick={() => onDelete()}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              padding: '2px', color: 'var(--color-text-muted)',
-              display: 'flex', alignItems: 'center', flexShrink: 0
-            }}
-          >
-            <Trash2 size={14} />
+          <button onClick={() => onDelete()} style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '4px', color: 'var(--color-text-muted)',
+            display: 'flex', alignItems: 'center', flexShrink: 0
+          }}>
+            <Trash2 size={15} />
           </button>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Neu-laden Modal mit Tagesauswahl
+function ReloadModal({ onClose, onGenerate, generating }) {
+  const [selectedDays, setSelectedDays] = useState([0, 1, 2, 3, 4, 5, 6])
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0,
+      background: 'rgba(0,0,0,0.4)', zIndex: 200,
+      display: 'flex', alignItems: 'flex-end'
+    }}>
+      <div style={{
+        background: 'var(--color-surface)',
+        borderRadius: '20px 20px 0 0',
+        width: '100%', padding: '20px'
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', marginBottom: '16px'
+        }}>
+          <div>
+            <div style={{fontSize: '16px', fontWeight: '600', color: 'var(--color-text)'}}>
+              Liste neu laden
+            </div>
+            <div style={{fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px'}}>
+              Für welche Tage sollen Zutaten geladen werden?
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--color-text-muted)'
+          }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Tages-Chips */}
+        <div style={{display: 'flex', gap: '6px', marginBottom: '16px'}}>
+          {DAYS_SHORT.map((day, i) => (
+            <button
+              key={i}
+              onClick={() => setSelectedDays(prev =>
+                prev.includes(i) ? prev.filter(d => d !== i) : [...prev, i]
+              )}
+              style={{
+                flex: 1, padding: '10px 4px',
+                borderRadius: '10px', border: 'none',
+                cursor: 'pointer', fontSize: '12px',
+                fontWeight: selectedDays.includes(i) ? '600' : '400',
+                background: selectedDays.includes(i)
+                  ? '#c1522a' : 'var(--color-surface-2)',
+                color: selectedDays.includes(i) ? '#fff' : 'var(--color-text-muted)',
+                transition: 'all 0.15s'
+              }}
+            >
+              {day}
+            </button>
+          ))}
+        </div>
+
+        {/* Schnellauswahl */}
+        <div style={{display: 'flex', gap: '8px', marginBottom: '16px'}}>
+          {[
+            { label: 'Mo–Mi', days: [0, 1, 2] },
+            { label: 'Do–So', days: [3, 4, 5, 6] },
+            { label: 'Ganze Woche', days: [0,1,2,3,4,5,6] },
+          ].map(({ label, days }) => (
+            <button
+              key={label}
+              onClick={() => setSelectedDays(days)}
+              style={{
+                flex: 1, padding: '8px 6px',
+                borderRadius: '9px', border: '0.5px solid var(--color-border)',
+                cursor: 'pointer', fontSize: '11px',
+                background: 'var(--color-surface-2)',
+                color: 'var(--color-text-muted)',
+                transition: 'all 0.15s'
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={() => onGenerate(selectedDays)}
+          disabled={generating || selectedDays.length === 0}
+          style={{
+            width: '100%', padding: '14px',
+            background: generating || selectedDays.length === 0
+              ? 'var(--color-surface-2)' : '#c1522a',
+            color: generating || selectedDays.length === 0
+              ? 'var(--color-text-muted)' : '#fff',
+            border: 'none', borderRadius: '12px', cursor: 'pointer',
+            fontSize: '15px', fontWeight: '500',
+            display: 'flex', alignItems: 'center',
+            justifyContent: 'center', gap: '8px'
+          }}
+        >
+          <RefreshCw size={15}
+            style={{animation: generating ? 'spin 1s linear infinite' : 'none'}} />
+          {generating ? 'Lädt...' : 'Liste generieren für ' + selectedDays.length + ' Tage'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Artikel hinzufügen Modal (FAB)
+function AddItemModal({ onClose, onAdd, activeStore }) {
+  const [newItem, setNewItem] = useState('')
+  const [newAmount, setNewAmount] = useState('')
+  const [newUnit, setNewUnit] = useState('')
+  const [newCategory, setNewCategory] = useState('')
+  const [suggestions, setSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+
+  const computeSuggestions = (value) => {
+    if (!value.trim()) { setSuggestions([]); setShowSuggestions(false); return }
+    const lower = value.toLowerCase()
+    const baseList = activeStore === 'drugstore' ? SUGGESTIONS_DRUGSTORE : SUGGESTIONS_SUPERMARKET
+    const filtered = baseList
+      .filter(s => s.toLowerCase().includes(lower) && s.toLowerCase() !== lower)
+      .slice(0, 6)
+    setSuggestions(filtered)
+    setShowSuggestions(filtered.length > 0)
+  }
+
+  const handleSelectSuggestion = (suggestion) => {
+    setNewItem(suggestion)
+    setShowSuggestions(false)
+    const lower = suggestion.toLowerCase()
+    if (activeStore === 'supermarket') {
+      if (['äpfel','bananen','tomaten','paprika','zucchini','gurke','karotten',
+           'zwiebeln','knoblauch','kartoffeln','brokkoli','spinat','salat',
+           'champignons','avocado','erdbeeren'
+          ].some(v => lower.includes(v))) setNewCategory('Obst & Gemüse')
+      else if (['hähnchen','hackfleisch','lachs','thunfisch','speck','schinken',
+                'steak','filet','garnelen'
+               ].some(v => lower.includes(v))) setNewCategory('Fleisch & Fisch')
+      else if (['milch','joghurt','quark','sahne','eier','käse','mozzarella',
+                'parmesan','frischkäse','schmand','butter'
+               ].some(v => lower.includes(v))) setNewCategory('Kühlregal')
+      else if (['spaghetti','penne','nudel','fusilli'].some(v => lower.includes(v))) setNewCategory('Nudeln')
+      else if (['reis','couscous','quinoa','haferflocken'].some(v => lower.includes(v))) setNewCategory('Reis & Getreide')
+      else if (['brot','brötchen','toast','baguette'].some(v => lower.includes(v))) setNewCategory('Brot & Backwaren')
+      else if (['dose','kichererbsen','linsen','kokosmilch'].some(v => lower.includes(v))) setNewCategory('Konserven')
+      else if (['saft','wasser','cola','tee','kaffee'].some(v => lower.includes(v))) setNewCategory('Getränke')
+    } else {
+      if (['shampoo','duschgel','seife','zahnpasta','deo','bodylotion','creme','parfüm'
+          ].some(v => lower.includes(v))) setNewCategory('Körperpflege')
+      else if (['waschmittel','spülmittel','reiniger','müllbeutel','toilettenpapier'
+               ].some(v => lower.includes(v))) setNewCategory('Haushalt')
+      else if (['ibuprofen','paracetamol','pflaster','nasenspray','vitamin'
+               ].some(v => lower.includes(v))) setNewCategory('Gesundheit')
+      else if (['windeln','feuchttücher','babynahrung'].some(v => lower.includes(v))) setNewCategory('Baby')
+    }
+  }
+
+  const handleAdd = async () => {
+    if (!newItem.trim()) return
+    const defaultCat = activeStore === 'drugstore' ? 'Körperpflege' : 'Sonstiges'
+    await onAdd(
+      newItem.trim(),
+      newAmount ? parseFloat(newAmount) : null,
+      newUnit || null,
+      newCategory || defaultCat
+    )
+    setNewItem('')
+    setNewAmount('')
+    setNewUnit('')
+    setNewCategory('')
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0,
+      background: 'rgba(0,0,0,0.4)', zIndex: 200,
+      display: 'flex', alignItems: 'flex-end'
+    }}>
+      <div style={{
+        background: 'var(--color-surface)',
+        borderRadius: '20px 20px 0 0',
+        width: '100%', padding: '16px'
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', marginBottom: '12px'
+        }}>
+          <span style={{fontSize: '15px', fontWeight: '600', color: 'var(--color-text)'}}>
+            Artikel hinzufügen
+          </span>
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--color-text-muted)'
+          }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Name + Autocomplete */}
+        <div style={{position: 'relative', marginBottom: '8px'}}>
+          <input
+            value={newItem}
+            onChange={e => { setNewItem(e.target.value); computeSuggestions(e.target.value) }}
+            onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            placeholder="Artikel eingeben..."
+            autoFocus
+            style={{
+              width: '100%', padding: '13px 14px',
+              background: 'var(--color-surface-2)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: showSuggestions ? '12px 12px 0 0' : '12px',
+              fontSize: '16px', color: 'var(--color-text)',
+              outline: 'none', boxSizing: 'border-box'
+            }}
+          />
+          {showSuggestions && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+              background: 'var(--color-surface)',
+              border: '0.5px solid var(--color-border)',
+              borderTop: 'none', borderRadius: '0 0 12px 12px',
+              overflow: 'hidden'
+            }}>
+              {suggestions.map((suggestion, idx) => {
+                const lower = newItem.toLowerCase()
+                const matchIdx = suggestion.toLowerCase().indexOf(lower)
+                return (
+                  <button
+                    key={suggestion}
+                    onMouseDown={() => handleSelectSuggestion(suggestion)}
+                    style={{
+                      width: '100%', textAlign: 'left',
+                      padding: '12px 14px', background: 'none', border: 'none',
+                      borderTop: idx > 0 ? '0.5px solid var(--color-border)' : 'none',
+                      cursor: 'pointer', fontSize: '15px', color: 'var(--color-text)',
+                      display: 'flex', alignItems: 'center', gap: '10px'
+                    }}
+                  >
+                    <div style={{
+                      width: '7px', height: '7px', borderRadius: '50%',
+                      background: '#c1522a', flexShrink: 0, opacity: 0.5
+                    }} />
+                    <span>
+                      {matchIdx >= 0 ? (
+                        <>
+                          {suggestion.slice(0, matchIdx)}
+                          <span style={{fontWeight: '600', color: '#c1522a'}}>
+                            {suggestion.slice(matchIdx, matchIdx + newItem.length)}
+                          </span>
+                          {suggestion.slice(matchIdx + newItem.length)}
+                        </>
+                      ) : suggestion}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Menge + Einheit + Kategorie */}
+        <div style={{display: 'flex', gap: '8px', marginBottom: '12px'}}>
+          <input
+            value={newAmount}
+            onChange={e => setNewAmount(e.target.value)}
+            placeholder="Menge"
+            type="number" min="0" step="0.1"
+            style={{
+              width: '80px', padding: '11px 10px',
+              background: 'var(--color-surface-2)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: '10px', fontSize: '14px',
+              color: 'var(--color-text)', outline: 'none',
+              textAlign: 'center', flexShrink: 0, boxSizing: 'border-box'
+            }}
+          />
+          <select
+            value={newUnit}
+            onChange={e => setNewUnit(e.target.value)}
+            style={{
+              flex: 1, padding: '11px 8px',
+              background: 'var(--color-surface-2)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: '10px', fontSize: '13px',
+              color: newUnit ? 'var(--color-text)' : 'var(--color-text-muted)',
+              outline: 'none'
+            }}
+          >
+            <option value="">Einheit</option>
+            {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
+          <select
+            value={newCategory}
+            onChange={e => setNewCategory(e.target.value)}
+            style={{
+              flex: 1, padding: '11px 8px',
+              background: 'var(--color-surface-2)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: '10px', fontSize: '13px',
+              color: newCategory ? 'var(--color-text)' : 'var(--color-text-muted)',
+              outline: 'none'
+            }}
+          >
+            <option value="">Kategorie</option>
+            {(activeStore === 'drugstore' ? DRUGSTORE_CATS : SUPERMARKET_CATS).map(c => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{display: 'flex', gap: '8px'}}>
+          <button
+            onClick={handleAdd}
+            disabled={!newItem.trim()}
+            style={{
+              flex: 1, padding: '14px',
+              background: !newItem.trim() ? 'var(--color-surface-2)' : '#c1522a',
+              color: !newItem.trim() ? 'var(--color-text-muted)' : '#fff',
+              border: 'none', borderRadius: '12px',
+              cursor: !newItem.trim() ? 'not-allowed' : 'pointer',
+              fontSize: '15px', fontWeight: '500'
+            }}
+          >
+            Hinzufügen
+          </button>
+          <button
+            onClick={() => { handleAdd(); onClose() }}
+            disabled={!newItem.trim()}
+            style={{
+              padding: '14px 16px',
+              background: 'var(--color-surface-2)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: '12px', cursor: 'pointer',
+              fontSize: '13px', color: 'var(--color-text-muted)',
+              display: 'flex', alignItems: 'center', gap: '4px'
+            }}
+          >
+            <Check size={14} /> Fertig
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -256,23 +575,21 @@ export default function ShoppingList() {
   const {
     fetchList, generateFromPlan, addManualItem,
     toggleItem, deleteItem, clearChecked,
-    getGroupedItems, loading, items, drugstoreItems
+    getGroupedItems, loading, items, drugstoreItems,
+    list, drugList
   } = useShoppingStore()
 
   useOfflineSync()
   const isOffline = useShoppingStore(s => s.isOffline)
+  useWakeLock(true)
+  useShoppingRealtime(list?.id, drugList?.id)
 
   const [activeStore, setActiveStore] = useState('supermarket')
-  const [newItem, setNewItem] = useState('')
-  const [newAmount, setNewAmount] = useState('')
-  const [newUnit, setNewUnit] = useState('')
-  const [newCategory, setNewCategory] = useState('')
   const [generating, setGenerating] = useState(false)
-  const [showAddForm, setShowAddForm] = useState(false)
+  const [showReloadModal, setShowReloadModal] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
   const [showBasics, setShowBasics] = useState(false)
-  const [suggestions, setSuggestions] = useState([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
-  const [selectedDays, setSelectedDays] = useState([0, 1, 2, 3, 4, 5, 6])
+  const [hideDone, setHideDone] = useState(false)
 
   useEffect(() => {
     if (household && currentPlan) {
@@ -280,124 +597,28 @@ export default function ShoppingList() {
     }
   }, [household, currentPlan])
 
-  const handleGenerate = async () => {
-  setGenerating(true)
-  try {
-    const { data } = await supabase
-      .from('meal_plan_entries')
-      .select('*, recipes(id, name, servings, ingredients(*))')
-      .eq('plan_id', currentPlan.id)
+  const handleGenerate = async (selectedDays) => {
+    setGenerating(true)
+    try {
+      const { data } = await supabase
+        .from('meal_plan_entries')
+        .select('*, recipes(id, name, servings, ingredients(*))')
+        .eq('plan_id', currentPlan.id)
 
-    // Nur gewählte Tage — day_of_week ist 1-basiert
-    const filtered = (data || []).filter(e =>
-      e.meal_type === 'dinner' && selectedDays.includes(e.day_of_week - 1)
-    )
+      const filtered = (data || []).filter(e =>
+        e.meal_type === 'dinner' && selectedDays.includes(e.day_of_week - 1)
+      )
 
-    await generateFromPlan(filtered, household.id, currentPlan.id)
-
-    const dayLabels = selectedDays.sort().map(d => DAYS_SHORT[d]).join(', ')
-    toast.success('Liste für ' + dayLabels + ' generiert')
-  } finally {
-    setGenerating(false)
-  }
-}
-
-  const computeSuggestions = (value) => {
-    if (!value.trim()) {
-      setSuggestions([])
-      setShowSuggestions(false)
-      return
-    }
-    const lower = value.toLowerCase()
-    const baseList = activeStore === 'drugstore'
-      ? SUGGESTIONS_DRUGSTORE
-      : SUGGESTIONS_SUPERMARKET
-
-    const existingNames = (activeStore === 'drugstore' ? drugstoreItems : items)
-      .map(i => i.name)
-
-    const allSuggestions = [...new Set([...baseList, ...existingNames])]
-    const filtered = allSuggestions
-      .filter(s => s.toLowerCase().includes(lower) && s.toLowerCase() !== lower)
-      .slice(0, 6)
-
-    setSuggestions(filtered)
-    setShowSuggestions(filtered.length > 0)
-  }
-
-  const handleSelectSuggestion = (suggestion) => {
-    setNewItem(suggestion)
-    setShowSuggestions(false)
-
-    const lower = suggestion.toLowerCase()
-    if (activeStore === 'supermarket') {
-      if (['äpfel','bananen','orangen','tomaten','paprika','zucchini','gurke',
-           'karotten','zwiebeln','knoblauch','kartoffeln','brokkoli','spinat',
-           'salat','champignons','avocado','erdbeeren','trauben','zitronen'
-          ].some(v => lower.includes(v))) {
-        setNewCategory('Obst & Gemüse')
-      } else if (['hähnchen','hackfleisch','lachs','thunfisch','speck','schinken',
-                  'steak','filet','garnelen','fisch'
-          ].some(v => lower.includes(v))) {
-        setNewCategory('Fleisch & Fisch')
-      } else if (['milch','joghurt','quark','sahne','eier','käse','mozzarella',
-                  'parmesan','frischkäse','schmand','butter','skyr'
-          ].some(v => lower.includes(v))) {
-        setNewCategory('Kühlregal')
-      } else if (['spaghetti','penne','nudel','fusilli','rigatoni','tagliatelle'
-          ].some(v => lower.includes(v))) {
-        setNewCategory('Nudeln')
-      } else if (['reis','couscous','quinoa','haferflocken','bulgur','hirse'
-          ].some(v => lower.includes(v))) {
-        setNewCategory('Reis & Getreide')
-      } else if (['brot','brötchen','toast','baguette','ciabatta'
-          ].some(v => lower.includes(v))) {
-        setNewCategory('Brot & Backwaren')
-      } else if (['dose','kichererbsen','linsen','kidney','kokosmilch','passata'
-          ].some(v => lower.includes(v))) {
-        setNewCategory('Konserven')
-      } else if (['saft','wasser','mineralwasser','cola','tee','kaffee'
-          ].some(v => lower.includes(v))) {
-        setNewCategory('Getränke')
-      } else if (['tk','tiefkühl','eis','eiscreme','pommes'
-          ].some(v => lower.includes(v))) {
-        setNewCategory('Tiefkühl')
-      }
-    } else {
-      if (['shampoo','conditioner','duschgel','seife','zahnpasta','deo',
-           'bodylotion','gesichtscreme','sonnencreme','rasierschaum','parfüm'
-          ].some(v => lower.includes(v))) {
-        setNewCategory('Körperpflege')
-      } else if (['waschmittel','weichspüler','spülmittel','reiniger',
-                  'müllbeutel','küchenrolle','toilettenpapier','taschentücher'
-          ].some(v => lower.includes(v))) {
-        setNewCategory('Haushalt')
-      } else if (['ibuprofen','paracetamol','pflaster','nasenspray','vitamin'
-          ].some(v => lower.includes(v))) {
-        setNewCategory('Gesundheit')
-      } else if (['windeln','feuchttücher','babynahrung','babyshampoo'
-          ].some(v => lower.includes(v))) {
-        setNewCategory('Baby')
-      }
+      await generateFromPlan(filtered, household.id, currentPlan.id)
+      toast.success('Liste für ' + selectedDays.sort().map(d => DAYS_SHORT[d]).join(', ') + ' generiert')
+      setShowReloadModal(false)
+    } finally {
+      setGenerating(false)
     }
   }
 
-  const handleAddItem = async () => {
-    if (!newItem.trim()) return
-    const defaultCat = activeStore === 'drugstore' ? 'Körperpflege' : 'Sonstiges'
-    await addManualItem(
-      newItem.trim(),
-      newAmount ? parseFloat(newAmount) : null,
-      newUnit || null,
-      newCategory || defaultCat,
-      activeStore
-    )
-    setNewItem('')
-    setNewAmount('')
-    setNewUnit('')
-    setNewCategory('')
-    setShowAddForm(false)
-    setShowSuggestions(false)
+  const handleAddItem = async (name, amount, unit, category) => {
+    await addManualItem(name, amount, unit, category, activeStore)
   }
 
   const groups = getGroupedItems(activeStore, showBasics)
@@ -408,380 +629,154 @@ export default function ShoppingList() {
 
   const totalItems = allItems.length
   const checkedItems = allItems.filter(i => i.is_checked).length
+  const openItems = allItems.filter(i => !i.is_checked).length
   const progressPercent = totalItems > 0 ? Math.round((checkedItems / totalItems) * 100) : 0
   const allDone = totalItems > 0 && checkedItems === totalItems
   const hiddenBasicsCount = activeStore === 'supermarket'
-    ? items.filter(i => isBasicIngredient(i.name)).length
-    : 0
+    ? items.filter(i => isBasicIngredient(i.name)).length : 0
 
-  const accentColor = activeStore === 'drugstore' ? '#5F5E5A' : 'var(--color-accent)'
+  const drugstoreOpen = drugstoreItems.filter(i => !i.is_checked).length
 
   return (
-    <div style={{paddingBottom: '80px'}}>
+    <div style={{paddingBottom: '100px', position: 'relative', minHeight: '100dvh'}}>
 
-      {/* Header */}
+      {/* Header — kompakt */}
       <div style={{
-        padding: '16px 16px 0',
+        padding: '14px 16px',
         position: 'sticky', top: 0, zIndex: 10,
-        background: 'var(--color-bg)'
+        background: 'var(--color-bg)',
+        borderBottom: '0.5px solid var(--color-border)'
       }}>
-
-        {/* Titel + Neu laden */}
         <div style={{
           display: 'flex', alignItems: 'center',
           justifyContent: 'space-between', marginBottom: '10px'
         }}>
+          {/* Titel + Status */}
           <div>
             <h1 style={{
               fontSize: '20px', fontWeight: '600',
               color: 'var(--color-text)', letterSpacing: '-0.3px'
             }}>
-              Einkauf
+              {activeStore === 'drugstore' ? 'Drogerie' : 'Supermarkt'}
             </h1>
             <p style={{fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '1px'}}>
               {totalItems === 0
                 ? 'Leer'
                 : allDone
-                  ? 'Alles erledigt'
-                  : checkedItems + ' von ' + totalItems + ' · ' + progressPercent + '%'
+                  ? 'Alles erledigt 🎉'
+                  : openItems + ' offen · ' + checkedItems + ' erledigt'
               }
             </p>
           </div>
-          {activeStore === 'supermarket' && (
-            <button
-              onClick={handleGenerate}
-              disabled={generating || !currentPlan}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '5px',
-                padding: '8px 12px',
-                background: generating ? 'var(--color-surface-2)' : 'var(--color-accent)',
-                color: generating ? 'var(--color-text-muted)' : '#fff',
-                border: 'none', borderRadius: '10px',
-                cursor: generating || !currentPlan ? 'not-allowed' : 'pointer',
-                fontSize: '12px', fontWeight: '500'
-              }}
-            >
-              <RefreshCw
-                size={13}
-                style={{animation: generating ? 'spin 1s linear infinite' : 'none'}}
-              />
-              {generating ? 'Lädt...' : 'Neu laden'}
-            </button>
-          )}
-        </div>
 
-        {/* Tagesauswahl — nur Supermarkt */}
-{activeStore === 'supermarket' && (
-  <div style={{
-    background: 'var(--color-surface)',
-    border: '0.5px solid var(--color-border)',
-    borderRadius: '12px', padding: '10px 14px',
-    marginBottom: '10px'
-  }}>
-    <div style={{
-      fontSize: '12px', color: 'var(--color-text-muted)',
-      marginBottom: '8px'
-    }}>
-      Für welche Tage einkaufen?
-    </div>
-    <div style={{display: 'flex', gap: '5px'}}>
-      {DAYS_SHORT.map((day, i) => (
-        <button
-          key={i}
-          onClick={() => {
-            setSelectedDays(prev =>
-              prev.includes(i)
-                ? prev.filter(d => d !== i)
-                : [...prev, i]
-            )
-          }}
-          style={{
-            flex: 1, padding: '6px 2px',
-            borderRadius: '8px', border: 'none',
-            cursor: 'pointer', fontSize: '11px',
-            fontWeight: selectedDays.includes(i) ? '600' : '400',
-            background: selectedDays.includes(i)
-              ? 'var(--color-accent)'
-              : 'var(--color-surface-2)',
-            color: selectedDays.includes(i) ? '#fff' : 'var(--color-text-muted)',
-            transition: 'all 0.15s'
-          }}
-        >
-          {day}
-        </button>
-      ))}
-    </div>
-  </div>
-)}
+          {/* Rechte Aktionen */}
+          <div style={{display: 'flex', gap: '6px', alignItems: 'center'}}>
 
-        {/* Store Tabs */}
-        <div style={{display: 'flex', gap: '6px', marginBottom: '10px'}}>
-          <button
-            onClick={() => setActiveStore('supermarket')}
-            style={{
-              flex: 1, padding: '9px', borderRadius: '10px', cursor: 'pointer',
-              background: activeStore === 'supermarket' ? 'var(--color-accent)' : 'var(--color-surface)',
-              color: activeStore === 'supermarket' ? '#fff' : 'var(--color-text-muted)',
-              fontSize: '13px', fontWeight: activeStore === 'supermarket' ? '500' : '400',
-              border: activeStore === 'supermarket' ? 'none' : '0.5px solid var(--color-border)',
-              transition: 'all 0.15s'
-            }}
-          >
-            Supermarkt
-            {items.filter(i => !i.is_checked && (showBasics || !isBasicIngredient(i.name))).length > 0 && (
-              <span style={{
-                marginLeft: '6px', fontSize: '11px',
-                background: activeStore === 'supermarket' ? 'rgba(255,255,255,0.25)' : 'var(--color-surface-2)',
-                padding: '1px 6px', borderRadius: '20px'
-              }}>
-                {items.filter(i => !i.is_checked && (showBasics || !isBasicIngredient(i.name))).length}
-              </span>
+            {/* Drogerie Badge-Button */}
+            {activeStore === 'supermarket' ? (
+              <button
+                onClick={() => setActiveStore('drugstore')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  padding: '7px 10px',
+                  background: 'var(--color-surface)',
+                  border: '0.5px solid var(--color-border)',
+                  borderRadius: '10px', cursor: 'pointer',
+                  fontSize: '12px', color: 'var(--color-text-muted)',
+                  position: 'relative'
+                }}
+              >
+                Drogerie
+                {drugstoreOpen > 0 && (
+                  <span style={{
+                    background: '#5F5E5A', color: '#fff',
+                    fontSize: '10px', fontWeight: '600',
+                    padding: '1px 6px', borderRadius: '20px'
+                  }}>
+                    {drugstoreOpen}
+                  </span>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={() => setActiveStore('supermarket')}
+                style={{
+                  padding: '7px 10px',
+                  background: 'var(--color-surface)',
+                  border: '0.5px solid var(--color-border)',
+                  borderRadius: '10px', cursor: 'pointer',
+                  fontSize: '12px', color: 'var(--color-text-muted)'
+                }}
+              >
+                ← Supermarkt
+              </button>
             )}
-          </button>
-          <button
-            onClick={() => setActiveStore('drugstore')}
-            style={{
-              flex: 1, padding: '9px', borderRadius: '10px', cursor: 'pointer',
-              background: activeStore === 'drugstore' ? '#5F5E5A' : 'var(--color-surface)',
-              color: activeStore === 'drugstore' ? '#fff' : 'var(--color-text-muted)',
-              fontSize: '13px', fontWeight: activeStore === 'drugstore' ? '500' : '400',
-              border: activeStore === 'drugstore' ? 'none' : '0.5px solid var(--color-border)',
-              transition: 'all 0.15s'
-            }}
-          >
-            Drogerie
-            {drugstoreItems.filter(i => !i.is_checked).length > 0 && (
-              <span style={{
-                marginLeft: '6px', fontSize: '11px',
-                background: activeStore === 'drugstore' ? 'rgba(255,255,255,0.25)' : 'var(--color-surface-2)',
-                padding: '1px 6px', borderRadius: '20px'
-              }}>
-                {drugstoreItems.filter(i => !i.is_checked).length}
-              </span>
+
+            {/* Erledigte ausblenden */}
+            {checkedItems > 0 && (
+              <button
+                onClick={() => setHideDone(h => !h)}
+                style={{
+                  width: '34px', height: '34px', borderRadius: '9px',
+                  background: hideDone ? 'var(--color-accent-soft)' : 'var(--color-surface)',
+                  border: hideDone
+                    ? '0.5px solid var(--color-accent)'
+                    : '0.5px solid var(--color-border)',
+                  cursor: 'pointer', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center',
+                  color: hideDone ? 'var(--color-accent)' : 'var(--color-text-muted)'
+                }}
+              >
+                {hideDone ? <Eye size={15} /> : <EyeOff size={15} />}
+              </button>
             )}
-          </button>
+
+            {/* Neu laden */}
+            {activeStore === 'supermarket' && (
+              <button
+                onClick={() => setShowReloadModal(true)}
+                disabled={!currentPlan}
+                style={{
+                  width: '34px', height: '34px',
+                  background: 'var(--color-accent)',
+                  border: 'none', borderRadius: '9px',
+                  cursor: !currentPlan ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  opacity: !currentPlan ? 0.5 : 1
+                }}
+              >
+                <RefreshCw size={15} color="#fff" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Fortschrittsbalken */}
         {totalItems > 0 && (
           <div style={{
             height: '3px', background: 'var(--color-surface-2)',
-            borderRadius: '2px', overflow: 'hidden', marginBottom: '10px'
+            borderRadius: '2px', overflow: 'hidden'
           }}>
             <div style={{
               height: '100%',
-              background: allDone ? '#22c55e' : accentColor,
+              background: allDone ? '#22c55e' : activeStore === 'drugstore' ? '#5F5E5A' : '#c1522a',
               width: progressPercent + '%',
               borderRadius: '2px', transition: 'width 0.4s ease'
             }} />
           </div>
         )}
+      </div>
 
-        {/* Artikel hinzufügen */}
-        {showAddForm ? (
-          <div style={{
-            background: 'var(--color-surface)',
-            border: '0.5px solid var(--color-border)',
-            borderRadius: '12px', padding: '10px',
-            marginBottom: '10px',
-            display: 'flex', flexDirection: 'column', gap: '7px'
-          }}>
-
-            {/* Name + Autocomplete */}
-            <div style={{position: 'relative'}}>
-              <input
-                value={newItem}
-                onChange={e => {
-                  setNewItem(e.target.value)
-                  computeSuggestions(e.target.value)
-                }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') { handleAddItem(); setShowSuggestions(false) }
-                  if (e.key === 'Escape') setShowSuggestions(false)
-                }}
-                onFocus={() => newItem.length > 0 && computeSuggestions(newItem)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                placeholder="Artikel eingeben..."
-                autoFocus
-                style={{
-                  width: '100%', padding: '9px 12px',
-                  background: 'var(--color-surface-2)',
-                  border: '0.5px solid var(--color-border)',
-                  borderRadius: showSuggestions ? '9px 9px 0 0' : '9px',
-                  fontSize: '14px', color: 'var(--color-text)',
-                  outline: 'none', boxSizing: 'border-box'
-                }}
-              />
-              {showSuggestions && (
-                <div style={{
-                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-                  background: 'var(--color-surface)',
-                  border: '0.5px solid var(--color-border)',
-                  borderTop: 'none', borderRadius: '0 0 9px 9px',
-                  overflow: 'hidden'
-                }}>
-                  {suggestions.map((suggestion, idx) => {
-                    const lower = newItem.toLowerCase()
-                    const sLower = suggestion.toLowerCase()
-                    const matchIdx = sLower.indexOf(lower)
-                    return (
-                      <button
-                        key={suggestion}
-                        onMouseDown={() => handleSelectSuggestion(suggestion)}
-                        style={{
-                          width: '100%', textAlign: 'left',
-                          padding: '10px 12px', background: 'none', border: 'none',
-                          borderTop: idx > 0 ? '0.5px solid var(--color-border)' : 'none',
-                          cursor: 'pointer', fontSize: '14px', color: 'var(--color-text)',
-                          display: 'flex', alignItems: 'center', gap: '8px'
-                        }}
-                      >
-                        <div style={{
-                          width: '6px', height: '6px', borderRadius: '50%',
-                          background: accentColor, flexShrink: 0, opacity: 0.6
-                        }} />
-                        <span>
-                          {matchIdx >= 0 ? (
-                            <>
-                              {suggestion.slice(0, matchIdx)}
-                              <span style={{fontWeight: '600', color: accentColor}}>
-                                {suggestion.slice(matchIdx, matchIdx + newItem.length)}
-                              </span>
-                              {suggestion.slice(matchIdx + newItem.length)}
-                            </>
-                          ) : suggestion}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Menge + Einheit */}
-            <div style={{display: 'flex', gap: '7px'}}>
-              <input
-                value={newAmount}
-                onChange={e => setNewAmount(e.target.value)}
-                placeholder="Menge"
-                type="number"
-                min="0"
-                step="0.1"
-                style={{
-                  width: '80px', padding: '9px 10px',
-                  background: 'var(--color-surface-2)',
-                  border: '0.5px solid var(--color-border)',
-                  borderRadius: '9px', fontSize: '13px',
-                  color: 'var(--color-text)', outline: 'none',
-                  textAlign: 'center', flexShrink: 0,
-                  boxSizing: 'border-box'
-                }}
-              />
-              <select
-                value={newUnit}
-                onChange={e => setNewUnit(e.target.value)}
-                style={{
-                  flex: 1, padding: '9px 8px',
-                  background: 'var(--color-surface-2)',
-                  border: '0.5px solid var(--color-border)',
-                  borderRadius: '9px', fontSize: '13px',
-                  color: newUnit ? 'var(--color-text)' : 'var(--color-text-muted)',
-                  outline: 'none'
-                }}
-              >
-                <option value="">Einheit (optional)</option>
-                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-              </select>
-            </div>
-
-            {/* Kategorie */}
-            <select
-              value={newCategory}
-              onChange={e => setNewCategory(e.target.value)}
-              style={{
-                padding: '8px 10px',
-                background: 'var(--color-surface-2)',
-                border: '0.5px solid var(--color-border)',
-                borderRadius: '9px', fontSize: '13px',
-                color: newCategory ? 'var(--color-text)' : 'var(--color-text-muted)',
-                outline: 'none'
-              }}
-            >
-              <option value="">Kategorie wählen...</option>
-              {(activeStore === 'drugstore' ? DRUGSTORE_CATS : SUPERMARKET_CATS).map(c => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-
-            <div style={{display: 'flex', gap: '7px'}}>
-              <button
-                onClick={() => { handleAddItem(); setShowSuggestions(false) }}
-                style={{
-                  flex: 1, padding: '9px',
-                  background: accentColor, color: '#fff',
-                  border: 'none', borderRadius: '9px',
-                  cursor: 'pointer', fontSize: '13px', fontWeight: '500'
-                }}
-              >
-                Hinzufügen
-              </button>
-              <button
-                onClick={() => {
-                  setShowAddForm(false)
-                  setNewItem('')
-                  setNewAmount('')
-                  setNewUnit('')
-                  setShowSuggestions(false)
-                }}
-                style={{
-                  padding: '9px 12px',
-                  background: 'var(--color-surface-2)',
-                  border: '0.5px solid var(--color-border)',
-                  borderRadius: '9px', cursor: 'pointer',
-                  fontSize: '13px', color: 'var(--color-text-muted)'
-                }}
-              >
-                Abbrechen
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowAddForm(true)}
-            style={{
-              width: '100%', padding: '10px',
-              background: 'var(--color-surface)',
-              border: '0.5px solid var(--color-border)',
-              borderRadius: '10px', cursor: 'pointer',
-              fontSize: '13px', color: 'var(--color-text-muted)',
-              display: 'flex', alignItems: 'center', gap: '8px',
-              marginBottom: '10px'
-            }}
-          >
-            <div style={{
-              width: '20px', height: '20px', borderRadius: '5px',
-              background: activeStore === 'drugstore'
-                ? 'rgba(95,94,90,0.1)'
-                : 'var(--color-accent-soft)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <Plus size={13} color={accentColor} />
-            </div>
-            Artikel hinzufügen...
-          </button>
-        )}
-
-        {/* Basis-Zutaten Toggle */}
-        {activeStore === 'supermarket' && hiddenBasicsCount > 0 && (
+      {/* Basis-Zutaten Toggle */}
+      {activeStore === 'supermarket' && hiddenBasicsCount > 0 && (
+        <div style={{padding: '8px 16px 0'}}>
           <button
             onClick={() => setShowBasics(s => !s)}
             style={{
-              width: '100%', padding: '7px',
-              background: 'none',
+              width: '100%', padding: '7px', background: 'none',
               border: '0.5px solid var(--color-border)',
               borderRadius: '9px', cursor: 'pointer',
-              fontSize: '11px', color: 'var(--color-text-muted)',
-              marginBottom: '10px'
+              fontSize: '11px', color: 'var(--color-text-muted)'
             }}
           >
             {showBasics
@@ -789,19 +784,16 @@ export default function ShoppingList() {
               : hiddenBasicsCount + ' Basis-Zutaten ausgeblendet (Öl, Gewürze...)'
             }
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Offline Banner */}
       {isOffline && (
         <div style={{
-          margin: '0 16px 10px',
-          padding: '10px 14px',
-          background: '#fef3c7',
-          border: '0.5px solid #f59e0b',
-          borderRadius: '10px',
-          display: 'flex', alignItems: 'center', gap: '8px',
-          fontSize: '13px', color: '#92400e'
+          margin: '8px 16px 0', padding: '10px 14px',
+          background: '#fef3c7', border: '0.5px solid #f59e0b',
+          borderRadius: '10px', display: 'flex', alignItems: 'center',
+          gap: '8px', fontSize: '13px', color: '#92400e'
         }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
             stroke="#92400e" strokeWidth="2" strokeLinecap="round">
@@ -813,7 +805,7 @@ export default function ShoppingList() {
       )}
 
       {/* Liste */}
-      <div style={{padding: '0 16px'}}>
+      <div style={{padding: '12px 16px 0'}}>
         {loading ? (
           <>
             <SkeletonStyles />
@@ -829,9 +821,7 @@ export default function ShoppingList() {
               background: 'var(--color-surface-2)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               margin: '0 auto 14px', fontSize: '24px'
-            }}>
-              🛒
-            </div>
+            }}>🛒</div>
             <p style={{
               fontWeight: '500', fontSize: '15px',
               color: 'var(--color-text)', marginBottom: '6px'
@@ -840,69 +830,85 @@ export default function ShoppingList() {
             </p>
             <p style={{fontSize: '13px', color: 'var(--color-text-muted)'}}>
               {activeStore === 'drugstore'
-                ? 'Füge Artikel manuell hinzu'
-                : 'Plane Gerichte und lade die Liste neu'
+                ? 'Tippe + um Artikel hinzuzufügen'
+                : 'Tippe ↺ um Zutaten aus dem Wochenplan zu laden'
               }
             </p>
           </div>
         ) : (
-          <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+          <div style={{display: 'flex', flexDirection: 'column', gap: '20px'}}>
             {groups.map(({ category, items: groupItems }) => {
-              const checkedInGroup = groupItems.filter(i => i.is_checked).length
-              const allGroupDone = checkedInGroup === groupItems.length && groupItems.length > 0
-              const openItems = groupItems.filter(i => !i.is_checked)
-              const doneItems = groupItems.filter(i => i.is_checked)
+              const openGroupItems = groupItems.filter(i => !i.is_checked)
+              const doneGroupItems = groupItems.filter(i => i.is_checked)
+              const allGroupDone = doneGroupItems.length === groupItems.length && groupItems.length > 0
+              const visibleDone = hideDone ? [] : doneGroupItems
+
+              if (hideDone && openGroupItems.length === 0) return null
 
               return (
                 <div key={category}>
+                  {/* Kategorie-Header mit Akzentbalken */}
                   <div style={{
                     display: 'flex', alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '6px', padding: '0 2px'
+                    gap: '8px', marginBottom: '7px', padding: '0 2px'
                   }}>
+                    <div style={{
+                      width: '3px', height: '14px', borderRadius: '2px',
+                      background: allGroupDone
+                        ? 'var(--color-border)'
+                        : activeStore === 'drugstore' ? '#5F5E5A' : '#c1522a',
+                      flexShrink: 0,
+                      transition: 'background 0.3s'
+                    }} />
                     <span style={{
-                      fontSize: '11px', fontWeight: '500',
-                      color: allGroupDone ? 'var(--color-text-muted)' : 'var(--color-text)',
-                      textTransform: 'uppercase', letterSpacing: '0.4px'
+                      fontSize: '12px', fontWeight: '500',
+                      color: allGroupDone
+                        ? 'var(--color-text-muted)'
+                        : 'var(--color-text)',
+                      flex: 1
                     }}>
                       {category}
                     </span>
-                    <span style={{fontSize: '11px', color: 'var(--color-text-muted)'}}>
-                      {checkedInGroup}/{groupItems.length}
+                    <span style={{
+                      fontSize: '11px', color: 'var(--color-text-muted)',
+                      background: allGroupDone ? '#f0fdf4' : 'var(--color-surface-2)',
+                      padding: '1px 7px', borderRadius: '20px',
+                      color: allGroupDone ? '#16a34a' : 'var(--color-text-muted)',
+                      fontWeight: allGroupDone ? '500' : '400'
+                    }}>
+                      {allGroupDone ? '✓ ' : ''}{doneGroupItems.length}/{groupItems.length}
                     </span>
                   </div>
 
                   <div style={{
                     background: 'var(--color-surface)',
                     border: '0.5px solid var(--color-border)',
-                    borderRadius: '12px', overflow: 'hidden',
-                    opacity: allGroupDone ? 0.6 : 1,
+                    borderRadius: '14px', overflow: 'hidden',
+                    opacity: allGroupDone ? 0.55 : 1,
                     transition: 'opacity 0.3s'
                   }}>
-                    {openItems.map((item, idx) => (
+                    {openGroupItems.map((item, idx) => (
                       <div key={item.id} style={{
                         borderTop: idx > 0 ? '0.5px solid var(--color-border)' : 'none'
                       }}>
                         <SwipeItem
                           item={item}
-                          accentColor={accentColor}
                           onToggle={(checked) => toggleItem(item.id, checked, activeStore)}
                           onDelete={() => deleteItem(item.id, activeStore)}
                         />
                       </div>
                     ))}
 
-                    {doneItems.length > 0 && openItems.length > 0 && (
+                    {visibleDone.length > 0 && openGroupItems.length > 0 && (
                       <div style={{height: '0.5px', background: 'var(--color-border)'}} />
                     )}
 
-                    {doneItems.map((item, idx) => (
+                    {visibleDone.map((item, idx) => (
                       <div key={item.id} style={{
                         borderTop: idx > 0 ? '0.5px solid var(--color-border)' : 'none'
                       }}>
                         <SwipeItem
                           item={item}
-                          accentColor={accentColor}
                           onToggle={(checked) => toggleItem(item.id, checked, activeStore)}
                           onDelete={() => deleteItem(item.id, activeStore)}
                         />
@@ -917,10 +923,9 @@ export default function ShoppingList() {
               <button
                 onClick={() => clearChecked(activeStore)}
                 style={{
-                  width: '100%', padding: '10px',
-                  background: 'none',
+                  width: '100%', padding: '11px', background: 'none',
                   border: '0.5px solid var(--color-border)',
-                  borderRadius: '10px', cursor: 'pointer',
+                  borderRadius: '12px', cursor: 'pointer',
                   fontSize: '13px', color: 'var(--color-text-muted)',
                   display: 'flex', alignItems: 'center',
                   justifyContent: 'center', gap: '6px'
@@ -933,19 +938,19 @@ export default function ShoppingList() {
 
             {allDone && (
               <div style={{
-                padding: '20px',
+                padding: '24px 20px',
                 background: 'var(--color-accent-soft)',
                 border: '0.5px solid var(--color-accent)',
                 borderRadius: '14px', textAlign: 'center'
               }}>
-                <div style={{fontSize: '28px', marginBottom: '8px'}}>🎉</div>
+                <div style={{fontSize: '32px', marginBottom: '10px'}}>🎉</div>
                 <p style={{
-                  fontWeight: '500', fontSize: '14px',
-                  color: 'var(--color-accent-text)', marginBottom: '3px'
+                  fontWeight: '500', fontSize: '16px',
+                  color: 'var(--color-accent-text)', marginBottom: '4px'
                 }}>
                   Einkauf erledigt!
                 </p>
-                <p style={{fontSize: '12px', color: 'var(--color-accent-text)', opacity: 0.7}}>
+                <p style={{fontSize: '13px', color: 'var(--color-accent-text)', opacity: 0.7}}>
                   Alle {totalItems} Artikel eingekauft
                 </p>
               </div>
@@ -953,6 +958,43 @@ export default function ShoppingList() {
           </div>
         )}
       </div>
+
+      {/* FAB — Floating Action Button */}
+      <button
+        onClick={() => setShowAddModal(true)}
+        style={{
+          position: 'fixed',
+          bottom: '88px',
+          right: '20px',
+          width: '52px', height: '52px',
+          borderRadius: '50%',
+          background: activeStore === 'drugstore' ? '#5F5E5A' : '#c1522a',
+          border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+          zIndex: 40,
+          transition: 'transform 0.15s',
+        }}
+      >
+        <Plus size={24} color="#fff" strokeWidth={2.5} />
+      </button>
+
+      {/* Modals */}
+      {showReloadModal && (
+        <ReloadModal
+          onClose={() => setShowReloadModal(false)}
+          onGenerate={handleGenerate}
+          generating={generating}
+        />
+      )}
+
+      {showAddModal && (
+        <AddItemModal
+          onClose={() => setShowAddModal(false)}
+          onAdd={handleAddItem}
+          activeStore={activeStore}
+        />
+      )}
 
       <style>{`
         @keyframes spin {
