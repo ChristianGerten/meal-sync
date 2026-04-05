@@ -8,9 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { SkeletonPlanDay, SkeletonStyles } from '../components/Skeleton'
 import { toast } from '../components/Toast'
 import { ChevronLeft, ChevronRight, Plus, X, ChefHat, FileText, Users, Shuffle, Refrigerator } from 'lucide-react'
-  
 
-const navigate = useNavigate()
 const DAYS = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag']
 const DAYS_SHORT = ['Mo','Di','Mi','Do','Fr','Sa','So']
 const CATEGORIES = ['Alle', 'Pasta', 'Suppe', 'Salat', 'Fleisch', 'Fisch', 'Vegetarisch', 'Vegan', 'Backen', 'Dessert']
@@ -32,8 +30,6 @@ export default function WeekPlanner() {
   const [search, setSearch] = useState('')
   const [noteMode, setNoteMode] = useState(false)
   const [noteText, setNoteText] = useState('')
-
-  // Zufallsgericht
   const [showRandomPreview, setShowRandomPreview] = useState(false)
   const [selectedRecipe, setSelectedRecipe] = useState(null)
   const [randomCategory, setRandomCategory] = useState('Alle')
@@ -79,16 +75,13 @@ export default function WeekPlanner() {
           r.category?.toLowerCase() === randomCategory.toLowerCase() ||
           r.tags?.some(t => t.toLowerCase() === randomCategory.toLowerCase())
         )
-
     const available = pool.filter(r =>
       !entries.find(e => e.recipe_id === r.id && e.meal_type === 'dinner')
     )
-
     if (!available.length) {
       toast.info('Keine passenden Rezepte verfügbar')
       return
     }
-
     const random = available[Math.floor(Math.random() * available.length)]
     setSelectedRecipe(random)
     setShowRandomPreview(true)
@@ -108,7 +101,6 @@ export default function WeekPlanner() {
   return (
     <div style={{paddingBottom: '80px'}}>
 
-      {/* Header */}
       <div style={{
         padding: '16px 16px 0',
         position: 'sticky', top: 0, zIndex: 10,
@@ -153,6 +145,20 @@ export default function WeekPlanner() {
             }}>
               Heute
             </button>
+            <button
+              onClick={() => navigate('/fridge')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                padding: '5px 9px', borderRadius: '8px',
+                background: 'var(--color-accent-soft)',
+                border: '0.5px solid var(--color-accent)',
+                cursor: 'pointer', fontSize: '11px',
+                color: 'var(--color-accent-text)', fontWeight: '500'
+              }}
+            >
+              <Refrigerator size={13} />
+              Kühlschrank
+            </button>
             <button onClick={() => setWeek(addDays(weekStart, 7))} style={{
               width: '30px', height: '30px', borderRadius: '8px',
               background: 'var(--color-surface)',
@@ -166,7 +172,6 @@ export default function WeekPlanner() {
           </div>
         </div>
 
-        {/* Tag-Chips */}
         <div style={{
           display: 'flex', gap: '5px',
           marginBottom: '14px', overflowX: 'auto',
@@ -224,7 +229,6 @@ export default function WeekPlanner() {
       </div>
 
       <div style={{padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '8px'}}>
-
         {loading ? (
           <>
             <SkeletonStyles />
@@ -240,7 +244,6 @@ export default function WeekPlanner() {
               {DAYS[activeDay]}, {format(weekDays[activeDay], 'd. MMMM', { locale: de })}
             </div>
 
-            {/* Gericht Card */}
             <div style={{
               background: 'var(--color-surface)',
               border: '0.5px solid var(--color-border)',
@@ -259,18 +262,16 @@ export default function WeekPlanner() {
                   Gericht
                 </span>
                 {!entry && (
-                  <div style={{display: 'flex', gap: '8px'}}>
-                    <button
-                      onClick={() => { setSelectedDay(activeDay); setModal(true) }}
-                      style={{
-                        fontSize: '11px', color: 'var(--color-accent)',
-                        background: 'none', border: 'none',
-                        cursor: 'pointer', fontWeight: '500'
-                      }}
-                    >
-                      + Wählen
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => { setSelectedDay(activeDay); setModal(true) }}
+                    style={{
+                      fontSize: '11px', color: 'var(--color-accent)',
+                      background: 'none', border: 'none',
+                      cursor: 'pointer', fontWeight: '500'
+                    }}
+                  >
+                    + Wählen
+                  </button>
                 )}
               </div>
 
@@ -315,21 +316,6 @@ export default function WeekPlanner() {
                           display: 'flex', alignItems: 'center', gap: '4px'
                         }}
                       >
-                      // Button neben den Navigations-Buttons:
-<button
-  onClick={() => navigate('/fridge')}
-  style={{
-    display: 'flex', alignItems: 'center', gap: '5px',
-    padding: '5px 10px', borderRadius: '8px',
-    background: 'var(--color-accent-soft)',
-    border: '0.5px solid var(--color-accent)',
-    cursor: 'pointer', fontSize: '11px',
-    color: 'var(--color-accent-text)', fontWeight: '500'
-  }}
->
-  <Refrigerator size={13} />
-  Kühlschrank
-</button>
                         <ChefHat size={12} /> Kochen
                       </button>
                       <button onClick={() => removeEntry(entry.id)} style={{
@@ -345,7 +331,6 @@ export default function WeekPlanner() {
                     </div>
                   </div>
 
-                  {/* Portionen */}
                   <div style={{
                     padding: '9px 13px',
                     borderTop: '0.5px solid var(--color-border)',
@@ -388,10 +373,7 @@ export default function WeekPlanner() {
                   </div>
                 </>
               ) : (
-                /* Kein Gericht — Zufallsgericht Button */
                 <div style={{padding: '14px 13px', display: 'flex', flexDirection: 'column', gap: '10px'}}>
-
-                  {/* Kategorie-Filter für Zufall */}
                   <div style={{display: 'flex', gap: '5px', overflowX: 'auto', scrollbarWidth: 'none'}}>
                     {CATEGORIES.map(cat => (
                       <button key={cat} onClick={() => setRandomCategory(cat)} style={{
@@ -406,27 +388,19 @@ export default function WeekPlanner() {
                       </button>
                     ))}
                   </div>
-
                   <div style={{display: 'flex', gap: '8px'}}>
-                    {/* Zufallsgericht */}
-                    <button
-                      onClick={handleRandomRecipe}
-                      style={{
-                        flex: 1, padding: '11px',
-                        background: 'var(--color-accent-soft)',
-                        border: '0.5px solid var(--color-accent)',
-                        borderRadius: '10px', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', gap: '6px',
-                        fontSize: '13px', fontWeight: '500',
-                        color: 'var(--color-accent-text)'
-                      }}
-                    >
-                      <Shuffle size={14} />
-                      Überrasch mich
+                    <button onClick={handleRandomRecipe} style={{
+                      flex: 1, padding: '11px',
+                      background: 'var(--color-accent-soft)',
+                      border: '0.5px solid var(--color-accent)',
+                      borderRadius: '10px', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', gap: '6px',
+                      fontSize: '13px', fontWeight: '500',
+                      color: 'var(--color-accent-text)'
+                    }}>
+                      <Shuffle size={14} /> Überrasch mich
                     </button>
-
-                    {/* Manuell wählen */}
                     <button
                       onClick={() => { setSelectedDay(activeDay); setModal(true) }}
                       style={{
@@ -439,15 +413,13 @@ export default function WeekPlanner() {
                         fontSize: '13px', color: 'var(--color-text-muted)'
                       }}
                     >
-                      <Plus size={14} />
-                      Selbst wählen
+                      <Plus size={14} /> Selbst wählen
                     </button>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Anmerkung */}
             <div style={{
               background: 'var(--color-surface)',
               border: '0.5px solid var(--color-border)',
@@ -468,10 +440,7 @@ export default function WeekPlanner() {
                 </span>
                 {!noteMode && (
                   <button
-                    onClick={() => {
-                      setNoteText(noteEntry?.custom_name || '')
-                      setNoteMode(true)
-                    }}
+                    onClick={() => { setNoteText(noteEntry?.custom_name || ''); setNoteMode(true) }}
                     style={{
                       fontSize: '11px', color: 'var(--color-accent)',
                       background: 'none', border: 'none',
@@ -482,7 +451,6 @@ export default function WeekPlanner() {
                   </button>
                 )}
               </div>
-
               {noteMode ? (
                 <div style={{padding: '10px 13px'}}>
                   <textarea
@@ -521,17 +489,13 @@ export default function WeekPlanner() {
                 </div>
               ) : noteEntry ? (
                 <div style={{padding: '10px 13px'}}>
-                  <p style={{
-                    fontSize: '13px', color: 'var(--color-text)',
-                    lineHeight: '1.5', margin: 0
-                  }}>
+                  <p style={{fontSize: '13px', color: 'var(--color-text)', lineHeight: '1.5', margin: 0}}>
                     {noteEntry.custom_name}
                   </p>
                 </div>
               ) : null}
             </div>
 
-            {/* Wochenübersicht */}
             <div style={{marginTop: '4px'}}>
               <div style={{
                 fontSize: '11px', fontWeight: '500',
@@ -551,17 +515,13 @@ export default function WeekPlanner() {
                   const n = getNoteEntry(i)
                   const isActive = activeDay === i
                   return (
-                    <div
-                      key={i}
-                      onClick={() => setActiveDay(i)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '10px',
-                        padding: '10px 13px',
-                        background: isActive ? 'var(--color-accent-soft)' : 'transparent',
-                        borderTop: i > 0 ? '0.5px solid var(--color-border)' : 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
+                    <div key={i} onClick={() => setActiveDay(i)} style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      padding: '10px 13px',
+                      background: isActive ? 'var(--color-accent-soft)' : 'transparent',
+                      borderTop: i > 0 ? '0.5px solid var(--color-border)' : 'none',
+                      cursor: 'pointer'
+                    }}>
                       <span style={{
                         fontSize: '11px', fontWeight: '500',
                         color: isActive ? 'var(--color-accent)' : 'var(--color-text-muted)',
@@ -603,7 +563,6 @@ export default function WeekPlanner() {
         )}
       </div>
 
-      {/* Zufallsgericht Vorschau Modal */}
       {showRandomPreview && selectedRecipe && (
         <div style={{
           position: 'fixed', inset: 0,
@@ -623,7 +582,6 @@ export default function WeekPlanner() {
             }}>
               Vorschlag für {DAYS[activeDay]}
             </div>
-
             <div style={{
               display: 'flex', gap: '14px', alignItems: 'center',
               padding: '14px', background: 'var(--color-surface-2)',
@@ -647,35 +605,27 @@ export default function WeekPlanner() {
                 {selectedRecipe.category && (
                   <div style={{fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '3px'}}>
                     {selectedRecipe.category}
-                    {selectedRecipe.rating ? ' · ' + '⭐'.repeat(selectedRecipe.rating) : ''}
                   </div>
                 )}
               </div>
             </div>
-
             <div style={{display: 'flex', gap: '8px'}}>
-              <button
-                onClick={handleRandomRecipe}
-                style={{
-                  flex: 1, padding: '13px',
-                  background: 'var(--color-surface-2)',
-                  border: '0.5px solid var(--color-border)',
-                  borderRadius: '12px', cursor: 'pointer',
-                  fontSize: '13px', color: 'var(--color-text-muted)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
-                }}
-              >
+              <button onClick={handleRandomRecipe} style={{
+                flex: 1, padding: '13px',
+                background: 'var(--color-surface-2)',
+                border: '0.5px solid var(--color-border)',
+                borderRadius: '12px', cursor: 'pointer',
+                fontSize: '13px', color: 'var(--color-text-muted)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+              }}>
                 <Shuffle size={14} /> Anderes
               </button>
-              <button
-                onClick={handleConfirmRandom}
-                style={{
-                  flex: 2, padding: '13px',
-                  background: 'var(--color-accent)', color: '#fff',
-                  border: 'none', borderRadius: '12px', cursor: 'pointer',
-                  fontSize: '14px', fontWeight: '500'
-                }}
-              >
+              <button onClick={handleConfirmRandom} style={{
+                flex: 2, padding: '13px',
+                background: 'var(--color-accent)', color: '#fff',
+                border: 'none', borderRadius: '12px', cursor: 'pointer',
+                fontSize: '14px', fontWeight: '500'
+              }}>
                 Einplanen
               </button>
               <button
@@ -696,7 +646,6 @@ export default function WeekPlanner() {
         </div>
       )}
 
-      {/* Rezept-Modal */}
       {modal && (
         <div style={{
           position: 'fixed', inset: 0,
@@ -739,18 +688,14 @@ export default function WeekPlanner() {
             </div>
             <div style={{overflowY: 'auto', flex: 1}}>
               {filtered.map(recipe => (
-                <button
-                  key={recipe.id}
-                  onClick={() => handleSelectRecipe(recipe)}
-                  style={{
-                    width: '100%', textAlign: 'left',
-                    padding: '11px 16px',
-                    background: 'none', border: 'none',
-                    borderBottom: '0.5px solid var(--color-border)',
-                    cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: '10px'
-                  }}
-                >
+                <button key={recipe.id} onClick={() => handleSelectRecipe(recipe)} style={{
+                  width: '100%', textAlign: 'left',
+                  padding: '11px 16px',
+                  background: 'none', border: 'none',
+                  borderBottom: '0.5px solid var(--color-border)',
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '10px'
+                }}>
                   <div style={{
                     width: '36px', height: '36px', borderRadius: '8px',
                     background: 'var(--color-surface-2)',
