@@ -11,8 +11,8 @@ import ShoppingList from './pages/ShoppingList'
 import CookingMode from './pages/CookingMode'
 import History from './pages/History'
 import Settings from './pages/Settings'
-import Layout from './components/layout/Layout'
 import FridgeCheck from './pages/FridgeCheck'
+import Layout from './components/layout/Layout'
 
 function AppRoutes() {
   const { user, household } = useAuthStore()
@@ -20,7 +20,6 @@ function AppRoutes() {
 
   if (!user) return <Navigate to="/login" replace />
 
-  // Haushalt noch nicht geladen — nur kurz warten
   if (!household) return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -49,6 +48,7 @@ function AppRoutes() {
         <Route path="/recipes/:id" element={<RecipeDetail />} />
         <Route path="/shopping" element={<ShoppingList />} />
         <Route path="/cook/:id" element={<CookingMode />} />
+        <Route path="/fridge" element={<FridgeCheck />} />
         <Route path="/history" element={<History />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
@@ -64,7 +64,6 @@ export default function App() {
     init()
   }, [])
 
-  // Nur ganz kurz loading zeigen — max 300ms spürbar
   if (loading) return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -90,7 +89,6 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/*" element={<AppRoutes />} />
-        <Route path="/fridge" element={<FridgeCheck />} />
       </Routes>
     </BrowserRouter>
   )
