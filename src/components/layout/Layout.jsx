@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuthStore } from '../../store/useAuthStore'
-import { CalendarDays, BookOpen, ShoppingCart, Clock, Settings, Sun, Moon, LogOut } from 'lucide-react'
+import { CalendarDays, BookOpen, ShoppingCart, Clock, Sun, Moon, LogOut, Refrigerator } from 'lucide-react'
 
 const navItems = [
   { to: '/planner', label: 'Planer', icon: CalendarDays },
@@ -34,7 +34,6 @@ export default function Layout({ children }) {
       height: '100dvh', background: 'var(--color-bg)'
     }}>
 
-      {/* Top Bar — sehr dezent */}
       <header style={{
         background: 'var(--color-surface)',
         borderBottom: '0.5px solid var(--color-border)',
@@ -92,12 +91,10 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      {/* Content */}
       <main style={{flex: 1, overflowY: 'auto', paddingBottom: '72px'}}>
         {children}
       </main>
 
-      {/* Bottom Nav — Pill Style */}
       <nav style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
         background: 'var(--color-nav)',
