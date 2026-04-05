@@ -6,6 +6,38 @@ import { useCookHistoryStore } from '../store/useCookHistoryStore'
 import { supabase } from '../lib/supabase'
 import { ArrowLeft, ChefHat, Timer, Plus, Minus, Play, Pause, RotateCcw, Check } from 'lucide-react'
 
+
+// Funktion außerhalb der Komponente — generiert einen Alarmton
+const playAlarm = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+
+    const beep = (startTime, frequency = 880, duration = 0.2) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.value = frequency
+      osc.type = 'sine'
+      gain.gain.setValueAtTime(0.4, startTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration)
+      osc.start(startTime)
+      osc.stop(startTime + duration)
+    }
+
+    // 3 Beeps mit steigender Frequenz
+    beep(ctx.currentTime + 0.0, 660, 0.25)
+    beep(ctx.currentTime + 0.3, 770, 0.25)
+    beep(ctx.currentTime + 0.6, 880, 0.4)
+    // Nach 1.5s nochmal
+    beep(ctx.currentTime + 1.5, 660, 0.25)
+    beep(ctx.currentTime + 1.8, 770, 0.25)
+    beep(ctx.currentTime + 2.1, 880, 0.4)
+
+  } catch (err) {
+    console.warn('Audio nicht verfügbar:', err)
+  }
+}
 // Zeitangaben im Text erkennen
 const extractTime = (text) => {
   const patterns = [
@@ -84,13 +116,14 @@ function CountdownTimer({ minutes, onDone, onClose }) {
     if (running && remaining > 0) {
       intervalRef.current = setInterval(() => {
         setRemaining(r => {
-          if (r <= 1) {
-            clearInterval(intervalRef.current)
-            setRunning(false)
-            if (navigator.vibrate) navigator.vibrate([500, 200, 500])
-            onDone?.()
-            return 0
-          }
+  if (r <= 1) {
+    clearInterval(intervalRef.current)
+    setRunning(false)
+    if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500])
+    playAlarm() // ← NEU
+    onDone?.()
+    return 0
+  }
           return r - 1
         })
       }, 1000)
