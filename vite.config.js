@@ -9,58 +9,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icons/*.png'],
-      manifest: {
-        name: 'MealSync',
-        short_name: 'MealSync',
-        description: 'Gemeinsame Wochenplanung für euren Haushalt',
-        theme_color: '#c1522a',
-        background_color: '#faf9f7',
-        display: 'standalone',
-        display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
-        orientation: 'portrait',
-        start_url: '/',
-        scope: '/',
-        lang: 'de',
-        categories: ['food', 'lifestyle', 'utilities'],
-        icons: [
-          {
-            src: '/icons/icon-192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: '/icons/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          },
-          {
-            src: '/icons/icon-maskable-192.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'maskable'
-          },
-          {
-            src: '/icons/icon-maskable-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable'
-          }
-        ],
-        screenshots: [],
-        shortcuts: [
-          {
-            name: 'Wochenplan',
-            url: '/planner',
-            icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }]
-          },
-          {
-            name: 'Einkaufsliste',
-            url: '/shopping',
-            icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }]
-          }
-        ]
-      },
+      manifest: false,
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: 'index.html',
