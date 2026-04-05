@@ -63,7 +63,7 @@ export default function ImportModal({ onClose }) {
     }
   }
 
-  // Text-Import via KI
+  // Text-Import via Edge Function
   const handleTextImport = async () => {
     if (!textInput.trim()) return
     setLoading(true)
@@ -71,43 +71,17 @@ export default function ImportModal({ onClose }) {
     setPreview(null)
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1500,
-          messages: [{
-            role: 'user',
-            content: 'Extract the recipe from this text and return ONLY a single-line JSON object. Format: {"name":"","description":"","category":"","servings":2,"prep_time":null,"cook_time":null,"tags":[],"ingredients":[{"name":"","amount":null,"unit":"","category":"Sonstiges"}],"steps":["step 1","step 2"]} Ingredient categories: Gemüse, Obst, Fleisch, Fisch, Kühlregal, Milchprodukte, Nudeln, Reis & Getreide, Konserven, Gewürze, Backen, Sonstiges. Extract ALL preparation steps. ONLY JSON.\n\nText:\n' + textInput
-          }, {
-            role: 'assistant',
-            content: '{'
-          }]
-        })
+      const { data, error: fnError } = await supabase.functions.invoke('parse-recipe-text', {
+        body: { text: textInput }
       })
 
-      const aiData = await response.json()
-      const rawText = '{' + aiData.content[0].text.trim()
-      const clean = rawText
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-        .replace(/\t/g, ' ')
-        .replace(/\n/g, ' ')
-        .replace(/\r/g, ' ')
-
-      let recipe
-      try {
-        recipe = JSON.parse(clean)
-      } catch {
-        const match = rawText.match(/\{[\s\S]*\}/)
-        recipe = match ? JSON.parse(match[0]) : null
-      }
-
-      if (!recipe?.name && !recipe?.ingredients?.length) {
+      if (fnError) throw fnError
+      if (data?.error) throw new Error(data.error)
+      if (!data?.name && !data?.ingredients?.length) {
         throw new Error('Kein Rezept im Text gefunden')
       }
 
-      setPreview(recipe)
+      setPreview(data)
     } catch (err) {
       setError('Fehler: ' + err.message)
     } finally {
@@ -161,13 +135,9 @@ export default function ImportModal({ onClose }) {
           display: 'flex', alignItems: 'center',
           justifyContent: 'space-between', flexShrink: 0
         }}>
-          <div>
-            <span style={{
-              fontWeight: '600', fontSize: '16px', color: 'var(--color-text)'
-            }}>
-              Rezept importieren
-            </span>
-          </div>
+          <span style={{fontWeight: '600', fontSize: '16px', color: 'var(--color-text)'}}>
+            Rezept importieren
+          </span>
           <button onClick={onClose} style={{
             background: 'none', border: 'none', cursor: 'pointer',
             color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center'
@@ -210,7 +180,6 @@ export default function ImportModal({ onClose }) {
               </p>
 
               <div style={{display: 'flex', gap: '10px', marginBottom: '14px'}}>
-
                 {/* Kamera */}
                 <label style={{
                   flex: 1, display: 'flex', flexDirection: 'column',
@@ -225,7 +194,8 @@ export default function ImportModal({ onClose }) {
                     background: 'var(--color-accent)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center'
                   }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                      stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                       <circle cx="12" cy="13" r="4"/>
                     </svg>
@@ -263,7 +233,9 @@ export default function ImportModal({ onClose }) {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     border: '0.5px solid var(--color-border)'
                   }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                      stroke="var(--color-text-muted)" strokeWidth="1.5"
+                      strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                       <circle cx="8.5" cy="8.5" r="1.5"/>
                       <polyline points="21 15 16 10 5 21"/>
@@ -286,7 +258,6 @@ export default function ImportModal({ onClose }) {
                     style={{display: 'none'}} disabled={loading}
                   />
                 </label>
-
               </div>
 
               {/* Tipp */}
@@ -324,9 +295,7 @@ export default function ImportModal({ onClose }) {
                       display: 'flex', flexDirection: 'column',
                       alignItems: 'center', justifyContent: 'center', gap: '8px'
                     }}>
-                      <div style={{
-                        fontSize: '13px', fontWeight: '500', color: '#fff'
-                      }}>
+                      <div style={{fontSize: '13px', fontWeight: '500', color: '#fff'}}>
                         KI analysiert das Bild...
                       </div>
                       <div style={{fontSize: '12px', color: 'rgba(255,255,255,0.7)'}}>
@@ -380,7 +349,10 @@ export default function ImportModal({ onClose }) {
                 borderRadius: '10px',
                 border: '0.5px solid var(--color-border)'
               }}>
-                <div style={{fontSize: '12px', fontWeight: '500', color: 'var(--color-text)', marginBottom: '3px'}}>
+                <div style={{
+                  fontSize: '12px', fontWeight: '500',
+                  color: 'var(--color-text)', marginBottom: '3px'
+                }}>
                   Funktioniert mit
                 </div>
                 <div style={{fontSize: '12px', color: 'var(--color-text-muted)', lineHeight: '1.5'}}>
