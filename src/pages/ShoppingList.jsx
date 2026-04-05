@@ -8,6 +8,7 @@ import { toast } from '../components/Toast'
 import { SkeletonShoppingGroup, SkeletonStyles } from '../components/Skeleton'
 import { useOfflineSync } from '../hooks/useOfflineSync'
 
+
 const SUGGESTIONS_SUPERMARKET = [
   'Äpfel', 'Bananen', 'Orangen', 'Zitronen', 'Limetten', 'Erdbeeren', 'Himbeeren',
   'Blaubeeren', 'Brombeeren', 'Trauben', 'Wassermelone', 'Melone', 'Mango',

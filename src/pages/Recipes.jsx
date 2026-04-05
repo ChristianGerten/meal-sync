@@ -4,11 +4,12 @@ import { useRecipeStore } from '../store/useRecipeStore'
 import { useAuthStore } from '../store/useAuthStore'
 import ImportModal from '../components/recipes/ImportModal'
 import { SkeletonRecipeCard, SkeletonStyles } from '../components/Skeleton'
-import { Heart, Star, Search, Plus, SlidersHorizontal } from 'lucide-react'
+import { Heart, Star, Search, Plus, SlidersHorizontal, Leaf } from 'lucide-react'
 import Fuse from 'fuse.js'
+import { getCurrentSeason, isInSeason, MONTH_NAMES } from '../data/seasons'
 
 const CATEGORIES = [
-  'Alle', 'Favoriten', 'Bewertet',
+  'Alle', 'Saisonal', 'Favoriten', 'Bewertet',
   'Pasta', 'Suppe', 'Salat', 'Fleisch', 'Fisch',
   'Vegetarisch', 'Vegan', 'Backen', 'Dessert', 'Frühstück'
 ]
@@ -48,7 +49,11 @@ export default function Recipes() {
   const [sortBy, setSortBy] = useState('name')
   const [showImport, setShowImport] = useState(false)
   const [showSort, setShowSort] = useState(false)
+  const [showSeasonBanner, setShowSeasonBanner] = useState(true)
   const navigate = useNavigate()
+
+  const season = getCurrentSeason()
+  const monthName = MONTH_NAMES[new Date().getMonth()]
 
   useEffect(() => {
     if (household) fetchRecipes(household.id)
@@ -65,13 +70,14 @@ export default function Recipes() {
     : [...recipes]
   )
     .filter(r => {
-      const matchCategory =
-        activeCategory === 'Alle' ? true :
-        activeCategory === 'Favoriten' ? r.is_favorite :
-        activeCategory === 'Bewertet' ? r.rating != null :
+      if (activeCategory === 'Alle') return true
+      if (activeCategory === 'Favoriten') return r.is_favorite
+      if (activeCategory === 'Bewertet') return r.rating != null
+      if (activeCategory === 'Saisonal') return isInSeason(r.name, r.tags, [])
+      return (
         r.category?.toLowerCase() === activeCategory.toLowerCase() ||
         r.tags?.some(t => t.toLowerCase() === activeCategory.toLowerCase())
-      return matchCategory
+      )
     })
     .sort((a, b) => {
       if (search.trim()) return 0
@@ -81,6 +87,7 @@ export default function Recipes() {
     })
 
   const favCount = recipes.filter(r => r.is_favorite).length
+  const seasonalCount = recipes.filter(r => isInSeason(r.name, r.tags, [])).length
 
   return (
     <div style={{paddingBottom: '80px'}}>
@@ -176,6 +183,51 @@ export default function Recipes() {
           </div>
         </div>
 
+        {/* Saison-Banner */}
+        {showSeasonBanner && activeCategory !== 'Saisonal' && (
+          <div
+            onClick={() => setActiveCategory('Saisonal')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '10px',
+              padding: '10px 13px', marginBottom: '10px',
+              background: '#f0fdf4',
+              border: '0.5px solid #bbf7d0',
+              borderRadius: '12px', cursor: 'pointer'
+            }}
+          >
+            <Leaf size={15} color="#16a34a" style={{flexShrink: 0}} />
+            <div style={{flex: 1, minWidth: 0}}>
+              <div style={{fontSize: '12px', fontWeight: '500', color: '#166534'}}>
+                Jetzt saisonal im {monthName}
+              </div>
+              <div style={{
+                fontSize: '11px', color: '#16a34a',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+              }}>
+                {[...season.vegetables.slice(0, 3), ...season.fruits.slice(0, 2)].join(' · ')}
+              </div>
+            </div>
+            {seasonalCount > 0 && (
+              <span style={{
+                fontSize: '11px', fontWeight: '500',
+                color: '#16a34a', flexShrink: 0
+              }}>
+                {seasonalCount} Rezepte →
+              </span>
+            )}
+            <button
+              onClick={e => { e.stopPropagation(); setShowSeasonBanner(false) }}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#16a34a', fontSize: '16px', lineHeight: 1,
+                padding: '0 2px', flexShrink: 0
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         <div style={{
           display: 'flex', alignItems: 'center', gap: '8px',
           background: 'var(--color-surface)',
@@ -215,19 +267,58 @@ export default function Recipes() {
               fontWeight: activeCategory === cat ? '500' : '400',
               whiteSpace: 'nowrap', flexShrink: 0,
               background: activeCategory === cat
-                ? 'var(--color-accent)'
+                ? cat === 'Saisonal' ? '#16a34a' : 'var(--color-accent)'
                 : 'var(--color-surface)',
               color: activeCategory === cat ? '#fff' : 'var(--color-text-muted)',
-              transition: 'all 0.15s'
+              transition: 'all 0.15s',
+              display: 'flex', alignItems: 'center', gap: '4px'
             }}>
+              {cat === 'Saisonal' && <Leaf size={10} />}
               {cat === 'Favoriten' && favCount > 0
                 ? 'Favoriten (' + favCount + ')'
-                : cat
+                : cat === 'Saisonal' && seasonalCount > 0
+                  ? 'Saisonal (' + seasonalCount + ')'
+                  : cat
               }
             </button>
           ))}
         </div>
       </div>
+
+      {/* Saison-Detail wenn aktiv */}
+      {activeCategory === 'Saisonal' && (
+        <div style={{
+          margin: '0 16px 14px',
+          padding: '12px 14px',
+          background: '#f0fdf4',
+          border: '0.5px solid #bbf7d0',
+          borderRadius: '12px'
+        }}>
+          <div style={{
+            fontSize: '12px', fontWeight: '500',
+            color: '#166534', marginBottom: '8px',
+            display: 'flex', alignItems: 'center', gap: '5px'
+          }}>
+            <Leaf size={12} /> Saisonal im {monthName}
+          </div>
+          <div style={{marginBottom: '6px'}}>
+            <div style={{fontSize: '10px', color: '#16a34a', fontWeight: '500', marginBottom: '3px'}}>
+              GEMÜSE
+            </div>
+            <div style={{fontSize: '12px', color: '#166534', lineHeight: '1.6'}}>
+              {season.vegetables.join(' · ')}
+            </div>
+          </div>
+          <div>
+            <div style={{fontSize: '10px', color: '#16a34a', fontWeight: '500', marginBottom: '3px'}}>
+              OBST
+            </div>
+            <div style={{fontSize: '12px', color: '#166534', lineHeight: '1.6'}}>
+              {season.fruits.join(' · ')}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{padding: '0 16px'}}>
         {loading ? (
@@ -245,7 +336,7 @@ export default function Recipes() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               margin: '0 auto 14px', fontSize: '24px'
             }}>
-              🍽️
+              {activeCategory === 'Saisonal' ? '🌿' : '🍽️'}
             </div>
             <p style={{
               fontWeight: '500', fontSize: '15px',
@@ -255,27 +346,19 @@ export default function Recipes() {
                 ? 'Kein Rezept gefunden'
                 : activeCategory === 'Favoriten'
                   ? 'Noch keine Favoriten'
-                  : 'Keine Rezepte'
+                  : activeCategory === 'Saisonal'
+                    ? 'Keine saisonalen Rezepte'
+                    : 'Keine Rezepte'
               }
             </p>
             <p style={{fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '20px'}}>
-              {search
-                ? 'Versuche einen anderen Suchbegriff'
-                : activeCategory === 'Favoriten'
-                  ? 'Tippe das Herz bei einem Rezept an'
+              {activeCategory === 'Saisonal'
+                ? 'Füge Rezepte mit saisonalen Zutaten hinzu'
+                : search
+                  ? 'Versuche einen anderen Suchbegriff'
                   : 'Füge dein erstes Rezept hinzu'
               }
             </p>
-            {!search && activeCategory !== 'Favoriten' && (
-              <button onClick={() => setShowImport(true)} style={{
-                padding: '10px 20px',
-                background: 'var(--color-accent)', color: '#fff',
-                border: 'none', borderRadius: '10px',
-                cursor: 'pointer', fontSize: '13px', fontWeight: '500'
-              }}>
-                Rezept importieren
-              </button>
-            )}
           </div>
         ) : (
           <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px'}}>
@@ -329,6 +412,20 @@ export default function Recipes() {
                       strokeWidth={2}
                     />
                   </button>
+
+                  {isInSeason(recipe.name, recipe.tags, []) && (
+                    <div style={{
+                      position: 'absolute', top: '7px', left: '7px',
+                      background: '#16a34a',
+                      borderRadius: '20px', padding: '2px 6px',
+                      display: 'flex', alignItems: 'center', gap: '3px'
+                    }}>
+                      <Leaf size={9} color="#fff" />
+                      <span style={{fontSize: '9px', color: '#fff', fontWeight: '500'}}>
+                        Saison
+                      </span>
+                    </div>
+                  )}
 
                   {recipe.rating && (
                     <div style={{
