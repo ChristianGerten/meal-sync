@@ -4,18 +4,15 @@ import { useShoppingStore, isBasicIngredient } from '../store/useShoppingStore'
 import { usePlanStore } from '../store/usePlanStore'
 import { useAuthStore } from '../store/useAuthStore'
 import { supabase } from '../lib/supabase'
+import { toast } from '../components/Toast'
 import { SkeletonShoppingGroup, SkeletonStyles } from '../components/Skeleton'
 import { useOfflineSync } from '../hooks/useOfflineSync'
 
 const SUGGESTIONS_SUPERMARKET = [
-  // Obst
   'Äpfel', 'Bananen', 'Orangen', 'Zitronen', 'Limetten', 'Erdbeeren', 'Himbeeren',
   'Blaubeeren', 'Brombeeren', 'Trauben', 'Wassermelone', 'Melone', 'Mango',
   'Ananas', 'Kiwi', 'Pfirsich', 'Nektarine', 'Pflaumen', 'Kirschen', 'Birnen',
   'Grapefruit', 'Clementinen', 'Mandarine', 'Feigen', 'Datteln', 'Granatapfel',
-  'Papaya', 'Passionsfrucht', 'Kokosnuss', 'Weintrauben',
-
-  // Gemüse
   'Tomaten', 'Cherrytomaten', 'Paprika', 'Zucchini', 'Gurke', 'Karotten',
   'Zwiebeln', 'Rote Zwiebeln', 'Frühlingszwiebeln', 'Knoblauch', 'Kartoffeln',
   'Süßkartoffeln', 'Brokkoli', 'Blumenkohl', 'Spinat', 'Salat', 'Rucola',
@@ -23,201 +20,97 @@ const SUGGESTIONS_SUPERMARKET = [
   'Lauch', 'Staudensellerie', 'Fenchel', 'Rote Bete', 'Radieschen',
   'Rettich', 'Kohlrabi', 'Rosenkohl', 'Weißkohl', 'Rotkohl', 'Spitzkohl',
   'Wirsing', 'Chinakohl', 'Pak Choi', 'Mais', 'Erbsen', 'Bohnen',
-  'Spargel', 'Artischocken', 'Rhabarber', 'Ingwer', 'Chili', 'Jalapeños',
+  'Spargel', 'Artischocken', 'Ingwer', 'Chili', 'Jalapeños',
   'Petersilie', 'Basilikum', 'Schnittlauch', 'Koriander', 'Thymian', 'Rosmarin',
-  'Minze', 'Salbei', 'Dill', 'Estragon',
-
-  // Fleisch
+  'Minze', 'Salbei', 'Dill',
   'Hähnchenbrust', 'Hähnchenkeule', 'Hähnchenschenkel', 'Ganzes Hähnchen',
   'Hackfleisch (gemischt)', 'Rinderhack', 'Schweinehack',
   'Rindersteak', 'Schweinefilet', 'Schweinekotelett', 'Schweinebauch',
-  'Rinderfilet', 'Rinderbraten', 'Lammkotelett', 'Lammhack', 'Lammkeule',
+  'Rinderfilet', 'Rinderbraten', 'Lammkotelett', 'Lammhack',
   'Speck', 'Bauchspeck', 'Schinken', 'Kochschinken', 'Serranoschinken',
   'Parmaschinken', 'Salami', 'Chorizo', 'Bratwurst', 'Weißwurst',
-  'Wiener Würstchen', 'Leberwurst', 'Truthahn', 'Ente', 'Wildschwein',
-
-  // Fisch & Meeresfrüchte
+  'Wiener Würstchen', 'Leberwurst',
   'Lachs', 'Lachsfilet', 'Räucherlachs', 'Thunfisch', 'Thunfisch (Dose)',
-  'Kabeljau', 'Seelachs', 'Forelle', 'Dorade', 'Wolfsbarsch', 'Tilapia',
+  'Kabeljau', 'Seelachs', 'Forelle', 'Dorade', 'Wolfsbarsch',
   'Sardinen', 'Sardinen (Dose)', 'Hering', 'Makrele', 'Garnelen',
-  'Krabben', 'Muscheln', 'Tintenfisch', 'Jakobsmuscheln', 'Pangasius',
-
-  // Milchprodukte & Kühlregal
   'Milch', 'Vollmilch', 'Fettarme Milch', 'Laktosefreie Milch', 'Hafermilch',
-  'Mandelmilch', 'Sojamilch', 'Kokosmilch (Kühlregal)', 'Joghurt', 'Naturjoghurt',
+  'Mandelmilch', 'Sojamilch', 'Joghurt', 'Naturjoghurt',
   'Griechischer Joghurt', 'Fruchtjoghurt', 'Quark', 'Magerquark', 'Sahne',
-  'Schlagsahne', 'Saure Sahne', 'Creme fraiche', 'Schmand', 'Butter',
-  'Margarine', 'Eier', 'Bio-Eier', 'Käse', 'Gouda', 'Emmentaler',
-  'Cheddar', 'Mozzarella', 'Büffelmozzarella', 'Parmesan', 'Pecorino',
-  'Feta', 'Brie', 'Camembert', 'Ricotta', 'Mascarpone', 'Frischkäse',
-  'Philadelphia', 'Hüttenkäse', 'Skyr', 'Kefir', 'Buttermilch',
-  'Crème fraîche', 'Pudding', 'Dessert',
-
-  // Brot & Backwaren
+  'Schlagsahne', 'Saure Sahne', 'Schmand', 'Butter', 'Eier', 'Bio-Eier',
+  'Käse', 'Gouda', 'Emmentaler', 'Cheddar', 'Mozzarella', 'Büffelmozzarella',
+  'Parmesan', 'Pecorino', 'Feta', 'Brie', 'Camembert', 'Ricotta',
+  'Mascarpone', 'Frischkäse', 'Hüttenkäse', 'Skyr', 'Kefir', 'Buttermilch',
   'Brot', 'Vollkornbrot', 'Weißbrot', 'Sauerteigbrot', 'Dinkelbrot',
   'Brötchen', 'Vollkornbrötchen', 'Toastbrot', 'Vollkorntoast',
   'Baguette', 'Ciabatta', 'Laugenbrezeln', 'Croissants', 'Bagels',
-  'Pita-Brot', 'Tortillas', 'Wraps', 'Knäckebrot', 'Zwieback',
-
-  // Nudeln & Getreide
+  'Pita-Brot', 'Tortillas', 'Wraps', 'Knäckebrot',
   'Spaghetti', 'Penne', 'Fusilli', 'Rigatoni', 'Tagliatelle', 'Linguine',
-  'Farfalle', 'Tortellini', 'Lasagneplatten', 'Gnocchi', 'Nudeln (allgemein)',
+  'Farfalle', 'Tortellini', 'Lasagneplatten', 'Gnocchi',
   'Vollkornnudeln', 'Reis', 'Basmati-Reis', 'Jasmin-Reis', 'Risotto-Reis',
   'Vollkornreis', 'Wildreis', 'Couscous', 'Bulgur', 'Quinoa', 'Hirse',
   'Polenta', 'Haferflocken', 'Müsli', 'Granola', 'Cornflakes',
-  'Paniermehl', 'Semmelbrösel', 'Mehl', 'Speisestärke',
-
-  // Konserven & Gläser
   'Tomaten (Dose)', 'Geschälte Tomaten', 'Tomatenmark', 'Passata',
   'Kichererbsen (Dose)', 'Linsen (Dose)', 'Kidneybohnen (Dose)',
   'Weiße Bohnen (Dose)', 'Mais (Dose)', 'Erbsen (Dose)',
-  'Thunfisch (Dose)', 'Sardinen (Dose)', 'Kokosmilch (Dose)',
-  'Artischockenherzen', 'Oliven', 'Kapern', 'Gürkchen', 'Essiggurken',
-  'Pesto', 'Tomatensauce', 'Bolognese (Glas)', 'Hummus',
-  'Erdnussbutter', 'Mandelmus', 'Marmelade', 'Honig', 'Ahornsirup',
-  'Nutella', 'Senf', 'Ketchup', 'Mayonnaise', 'Sojasauce',
-  'Worcestersauce', 'Tabasco', 'Sriracha', 'Fischsauce',
-
-  // Öle & Essig
-  'Olivenöl', 'Sonnenblumenöl', 'Rapsöl', 'Kokosöl', 'Sesamöl',
-  'Walnussöl', 'Weißweinessig', 'Rotweinessig', 'Balsamico', 'Apfelessig',
-
-  // Getränke
+  'Kokosmilch (Dose)', 'Artischockenherzen', 'Oliven', 'Kapern',
+  'Pesto', 'Tomatensauce', 'Hummus', 'Erdnussbutter', 'Mandelmus',
+  'Marmelade', 'Senf', 'Ketchup', 'Mayonnaise', 'Sojasauce',
   'Mineralwasser', 'Stilles Wasser', 'Orangensaft', 'Apfelsaft',
-  'Multivitaminsaft', 'Traubensaft', 'Tomatensaft', 'Limonade',
-  'Cola', 'Fanta', 'Sprite', 'Eistee', 'Kaffee', 'Kaffeebohnen',
-  'Filterkaffee', 'Espresso', 'Tee', 'Grüntee', 'Schwarztee',
-  'Kräutertee', 'Milch (Tetra)', 'Pflanzenmilch', 'Bier', 'Wein',
-  'Rotwein', 'Weißwein', 'Sekt', 'Prosecco',
-
-  // Tiefkühl
+  'Multivitaminsaft', 'Limonade', 'Cola', 'Eistee',
+  'Kaffee', 'Kaffeebohnen', 'Filterkaffee', 'Espresso',
+  'Tee', 'Grüntee', 'Schwarztee', 'Kräutertee',
   'Tiefkühlpizza', 'Tiefkühlgemüse', 'Erbsen (TK)', 'Spinat (TK)',
-  'Brokkoli (TK)', 'Blumenkohl (TK)', 'Mais (TK)', 'Bohnen (TK)',
-  'Garnelen (TK)', 'Fischstäbchen', 'Pommes frites', 'Kroketten',
-  'Eis', 'Eiscreme', 'Tiefkühlbeeren', 'Tiefkühlobst',
-
-  // Süßes & Snacks
+  'Brokkoli (TK)', 'Garnelen (TK)', 'Fischstäbchen', 'Pommes frites',
+  'Eis', 'Eiscreme', 'Tiefkühlbeeren',
   'Schokolade', 'Vollmilchschokolade', 'Zartbitterschokolade',
-  'Weiße Schokolade', 'Kekse', 'Butterkekse', 'Schokokekse',
-  'Chips', 'Salzstangen', 'Nüsse', 'Mandeln', 'Cashews', 'Walnüsse',
-  'Erdnüsse', 'Pistazien', 'Haselnüsse', 'Trockenfrüchte', 'Rosinen',
-  'Müsliriegel', 'Gummibärchen', 'Schokoladenriegel', 'Kaugummi',
-
-  // Backen
-  'Backpulver', 'Natron', 'Vanilleextrakt', 'Vanillezucker', 'Hefe',
-  'Trockenhefe', 'Zucker', 'Puderzucker', 'Brauner Zucker', 'Rohrzucker',
-  'Kakaopulver', 'Schokoladenraspeln', 'Backschokolade', 'Gelatine',
-
-  // Sonstiges
-  'Salz', 'Meersalz', 'Pfeffer', 'Olivenöl (extra vergine)',
-  'Knoblauchzehen', 'Zwiebeln (netz)', 'Kartoffeln (Sack)',
+  'Kekse', 'Chips', 'Salzstangen', 'Nüsse', 'Mandeln', 'Cashews',
+  'Walnüsse', 'Erdnüsse', 'Pistazien', 'Trockenfrüchte', 'Rosinen',
 ]
 
 const SUGGESTIONS_DRUGSTORE = [
-  // Haarpflege
   'Shampoo', 'Conditioner', 'Haarmaske', 'Haarkur', 'Trockenshampoo',
-  'Haarspülung', 'Haaröl', 'Haargel', 'Haarspray', 'Haarmousse',
-  'Haarcreme', 'Haarwachs', 'Haarbürste', 'Kamm', 'Haarnadeln',
-  'Haargummis', 'Haarklammern', 'Haarband', 'Haarfarbe', 'Blondiermittel',
-  'Tönungshampoo', 'Haarpflegespülung', 'Anti-Schuppen-Shampoo',
-  'Pflegeshampoo', 'Volumen-Shampoo', 'Feuchtigkeitsshampoo',
-
-  // Körperpflege
-  'Duschgel', 'Duschcreme', 'Duschschaum', 'Badeschaum', 'Badeöl',
-  'Badezusatz', 'Seife', 'Flüssigseife', 'Handseife', 'Körperlotion',
-  'Bodylotion', 'Körpercreme', 'Körperöl', 'Körperbutter', 'Handcreme',
-  'Handlotion', 'Fußcreme', 'Fußlotion', 'Fußbad', 'Peeling',
-  'Körperpeeling', 'Gesichtspeeling', 'Duschpeeling', 'Waschlappen',
-  'Badeschwamm', 'Luffa', 'Bimsstein', 'Nagelbürste',
-
-  // Gesichtspflege
+  'Haarspülung', 'Haaröl', 'Haargel', 'Haarspray', 'Haarbürste',
+  'Anti-Schuppen-Shampoo', 'Pflegeshampoo', 'Volumen-Shampoo',
+  'Duschgel', 'Duschcreme', 'Badeschaum', 'Badeöl', 'Seife',
+  'Flüssigseife', 'Handseife', 'Körperlotion', 'Bodylotion',
+  'Körpercreme', 'Körperöl', 'Handcreme', 'Fußcreme', 'Peeling',
   'Gesichtscreme', 'Tagescreme', 'Nachtcreme', 'Augencreme', 'Serum',
-  'Gesichtsserum', 'Gesichtswasser', 'Toner', 'Mizellenwasser',
-  'Gesichtsmaske', 'Reinigungsmilch', 'Gesichtsreinigung', 'Reinigungsgel',
-  'Reinigungsschaum', 'Make-up Entferner', 'Abschminkpads', 'Wattepads',
-  'Feuchtigkeitscreme', 'BB Cream', 'CC Cream', 'Primer', 'Foundation',
-  'Concealer', 'Puder', 'Rouge', 'Bronzer', 'Highlighter', 'Lidschatten',
-  'Eyeliner', 'Mascara', 'Wimperntusche', 'Lippenstift', 'Lipgloss',
-  'Lippenpflege', 'Lipliner', 'Nagellack', 'Nagellackentferner',
-
-  // Sonnenschutz & After Sun
-  'Sonnencreme', 'Sonnenschutzcreme', 'Sonnencreme LSF 30',
-  'Sonnencreme LSF 50', 'Sonnencreme LSF 50+', 'Sonnenspray',
-  'After Sun Lotion', 'After Sun Creme', 'Selbstbräuner',
-  'Sonnenschutzlippe', 'Sonnencreme Kinder',
-
-  // Deodorant & Körperhygiene
+  'Gesichtsserum', 'Mizellenwasser', 'Gesichtsmaske', 'Reinigungsmilch',
+  'Gesichtsreinigung', 'Make-up Entferner', 'Abschminkpads', 'Wattepads',
+  'Feuchtigkeitscreme', 'Foundation', 'Concealer', 'Puder', 'Rouge',
+  'Lidschatten', 'Eyeliner', 'Mascara', 'Lippenstift', 'Lipgloss',
+  'Lippenpflege', 'Nagellack', 'Nagellackentferner',
+  'Sonnencreme', 'Sonnencreme LSF 30', 'Sonnencreme LSF 50',
+  'After Sun Lotion', 'Selbstbräuner',
   'Deo', 'Deodorant', 'Deo-Spray', 'Deo-Roll-on', 'Deo-Stick',
-  'Antitranspirant', 'Parfüm', 'Eau de Toilette', 'Eau de Parfum',
-  'Bodyspray', 'Aftershave', 'Rasierklinge', 'Rasierer', 'Nassrasierer',
-  'Rasierschaum', 'Rasiergel', 'Rasierwasser', 'Enthaarungscreme',
-  'Wachsstreifen', 'Intimwaschlotion', 'Intimspray',
-
-  // Mundpflege
-  'Zahnpasta', 'Zahncreme', 'Kinderzahnpasta', 'Whitening Zahnpasta',
+  'Antitranspirant', 'Parfüm', 'Eau de Toilette', 'Bodyspray',
+  'Aftershave', 'Rasierschaum', 'Rasiergel', 'Rasierer', 'Rasierklinge',
+  'Zahnpasta', 'Kinderzahnpasta', 'Whitening Zahnpasta',
   'Zahnbürste', 'Elektrische Zahnbürste', 'Zahnbürstenköpfe',
   'Zahnseide', 'Interdentalbürsten', 'Mundspülung', 'Mundwasser',
-  'Zungenschaber', 'Zahnaufhellung', 'Zahnprothesenpfleger',
-
-  // Damenhygiene
   'Tampons', 'Binden', 'Slipeinlagen', 'Menstruationstasse',
-  'Periodenunterwäsche', 'Intimwaschlotion (Damen)', 'Monatshygiene',
-  'Damenbinden Nacht', 'Ultra-Binden',
-
-  // Babypflege
-  'Windeln', 'Windeln Größe 1', 'Windeln Größe 2', 'Windeln Größe 3',
-  'Windeln Größe 4', 'Windeln Größe 5', 'Feuchttücher', 'Babyfeuchttücher',
-  'Babynahrung', 'Babygläschen', 'Babyshampoo', 'Babyöl', 'Babycreme',
-  'Wundschutzcreme', 'Babypuder', 'Schnuller', 'Flaschen', 'Sauger',
-  'Babymilch', 'Anfangsmilch', 'Folgemiilch', 'Brei', 'Babybrei',
-
-  // Haushalt & Reinigung
+  'Windeln', 'Feuchttücher', 'Babyfeuchttücher',
+  'Babynahrung', 'Babyshampoo', 'Babyöl', 'Babycreme', 'Wundschutzcreme',
   'Waschmittel', 'Vollwaschmittel', 'Colorwaschmittel', 'Feinwaschmittel',
-  'Flüssigwaschmittel', 'Waschmittelpods', 'Weichspüler',
-  'Fleckentferner', 'Bleichmittel', 'Spülmittel', 'Geschirrspülmittel',
-  'Geschirrspültabs', 'Spülmaschinentabs', 'Klarspüler', 'Maschinenpfleger',
-  'WC-Reiniger', 'WC-Steine', 'WC-Ente', 'Badreiniger', 'Scheuermilch',
-  'Allzweckreiniger', 'Küchenreiniger', 'Glasreiniger', 'Fensterreiniger',
+  'Flüssigwaschmittel', 'Waschmittelpods', 'Weichspüler', 'Fleckentferner',
+  'Spülmittel', 'Geschirrspültabs', 'Spülmaschinentabs', 'Klarspüler',
+  'WC-Reiniger', 'WC-Steine', 'Badreiniger', 'Scheuermilch',
+  'Allzweckreiniger', 'Küchenreiniger', 'Glasreiniger',
   'Desinfektionsmittel', 'Desinfektionsspray', 'Handdesinfektionsmittel',
-  'Schimmelentferner', 'Rohrreiniger', 'Kalklöser', 'Entkalker',
-  'Backofenreiniger', 'Grillreiniger', 'Edelstahlpfleger',
-  'Möbelpolitur', 'Bodenpflegemittel', 'Parkettpflege',
-
-  // Papierwaren & Haushaltsbedarf
-  'Toilettenpapier', 'Küchenrolle', 'Taschentücher', 'Papierhandtücher',
-  'Servietten', 'Müllbeutel', 'Müllsäcke', 'Biomüllbeutel',
-  'Frischhaltebeutel', 'Gefrierbeutel', 'Alufolie', 'Frischhaltefolie',
-  'Backpapier', 'Haushaltshandschuhe', 'Einweghandschuhe',
-  'Schwämme', 'Topflappen', 'Geschirrtücher', 'Putztücher',
-  'Mikrofasertücher', 'Schrubber', 'Wischmopp', 'Besen', 'Handfeger',
-  'Staubsaugerbeutel', 'Lufterfrischer', 'Raumspray', 'Duftkerzen',
-
-  // Gesundheit & Medizin
-  'Ibuprofen', 'Paracetamol', 'Aspirin', 'Diclofenac',
-  'Hustensaft', 'Hustendrops', 'Halstabletten', 'Nasenspray',
-  'Meerwasser Nasenspray', 'Nasentropfen', 'Augentropfen',
-  'Ohrentropfen', 'Magentabletten', 'Antazida', 'Abführmittel',
-  'Durchfallmittel', 'Elektrolyte', 'Vitamin C', 'Vitamin D',
-  'Multivitamin', 'Zink', 'Magnesium', 'Omega-3', 'Probiotika',
-  'Melatonin', 'Baldrian', 'Schlaftabletten (pflanzlich)',
-  'Wärmepflaster', 'Kühlpads', 'Kühlspray', 'Wärmflasche',
-  'Pflaster', 'Wundpflaster', 'Wundverband', 'Mullbinden',
-  'Verbandsmull', 'Elastische Binde', 'Desinfektionsmittel (Wunde)',
-  'Betaisodona', 'Bepanthen', 'Wundsalbe', 'Zinksalbe',
-  'Hautcreme (medizinisch)', 'Fußpilzmittel', 'Nagelpilzmittel',
-  'Läusemittel', 'Mückenschutz', 'Mückenspray', 'Mückenarmbänder',
-  'Thermometer', 'Blutdruckmessgerät', 'Fieberthermometer',
-  'Blutzuckermessgerät', 'Teststreifen', 'Kondome', 'Verhütungsmittel',
-  'Schwangerschaftstest',
-
-  // Optik & Kontaktlinsen
-  'Kontaktlinsen', 'Kontaktlinsenpflegemittel', 'Kontaktlinsenbehälter',
-  'Brillenputztuch', 'Brillenreiniger',
-
-  // Haustier
-  'Hundefutter', 'Katzenfutter', 'Tiernahrung', 'Tiersnacks',
-  'Katzenstreu', 'Hundeshampoo', 'Floh- und Zeckenmittel',
+  'Entkalker', 'Backofenreiniger', 'Rohrreiniger',
+  'Toilettenpapier', 'Küchenrolle', 'Taschentücher', 'Servietten',
+  'Müllbeutel', 'Müllsäcke', 'Biomüllbeutel', 'Frischhaltebeutel',
+  'Gefrierbeutel', 'Alufolie', 'Frischhaltefolie', 'Backpapier',
+  'Haushaltshandschuhe', 'Schwämme', 'Mikrofasertücher', 'Putztücher',
+  'Ibuprofen', 'Paracetamol', 'Aspirin', 'Hustensaft', 'Hustendrops',
+  'Halstabletten', 'Nasenspray', 'Augentropfen', 'Magentabletten',
+  'Vitamin C', 'Vitamin D', 'Multivitamin', 'Zink', 'Magnesium', 'Omega-3',
+  'Pflaster', 'Wundverband', 'Mullbinden', 'Wundsalbe', 'Bepanthen',
+  'Thermometer', 'Kondome', 'Schwangerschaftstest',
+  'Kontaktlinsen', 'Kontaktlinsenpflegemittel',
+  'Hundefutter', 'Katzenfutter', 'Tiersnacks', 'Katzenstreu',
 ]
+
 const SUPERMARKET_CATS = [
   'Obst & Gemüse', 'Fleisch & Fisch', 'Kühlregal', 'Milchprodukte',
   'Brot & Backwaren', 'Nudeln', 'Reis & Getreide', 'Konserven',
@@ -228,7 +121,10 @@ const DRUGSTORE_CATS = [
   'Körperpflege', 'Haushalt', 'Gesundheit', 'Baby', 'Sonstiges (Drogerie)'
 ]
 
-function SwipeItem({ item, onToggle, onDelete }) {
+const UNITS = ['g', 'kg', 'ml', 'l', 'Stück', 'Packung', 'Dose', 'Flasche', 'Bund', 'EL', 'TL', 'Prise']
+const DAYS_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+
+function SwipeItem({ item, onToggle, onDelete, accentColor }) {
   const startX = useRef(null)
   const [offsetX, setOffsetX] = useState(0)
   const isDragging = useRef(false)
@@ -302,7 +198,7 @@ function SwipeItem({ item, onToggle, onDelete }) {
           style={{
             width: '24px', height: '24px', borderRadius: '50%',
             border: item.is_checked ? 'none' : '1.5px solid var(--color-border)',
-            background: item.is_checked ? 'var(--color-accent)' : 'transparent',
+            background: item.is_checked ? accentColor : 'transparent',
             cursor: 'pointer', flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             transition: 'all 0.15s'
@@ -367,12 +263,15 @@ export default function ShoppingList() {
 
   const [activeStore, setActiveStore] = useState('supermarket')
   const [newItem, setNewItem] = useState('')
+  const [newAmount, setNewAmount] = useState('')
+  const [newUnit, setNewUnit] = useState('')
   const [newCategory, setNewCategory] = useState('')
   const [generating, setGenerating] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [showBasics, setShowBasics] = useState(false)
   const [suggestions, setSuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [untilDay, setUntilDay] = useState(6)
 
   useEffect(() => {
     if (household && currentPlan) {
@@ -387,19 +286,24 @@ export default function ShoppingList() {
         .from('meal_plan_entries')
         .select('*, recipes(id, name, servings, ingredients(*))')
         .eq('plan_id', currentPlan.id)
-      await generateFromPlan(data || [], household.id, currentPlan.id)
+
+      const filtered = (data || []).filter(e =>
+        e.meal_type === 'dinner' && e.day_of_week <= untilDay + 1
+      )
+
+      await generateFromPlan(filtered, household.id, currentPlan.id)
+      toast.success('Liste für Mo–' + DAYS_SHORT[untilDay] + ' generiert')
     } finally {
       setGenerating(false)
     }
   }
 
   const computeSuggestions = (value) => {
-    if (!value.trim() || value.length < 1) {
+    if (!value.trim()) {
       setSuggestions([])
       setShowSuggestions(false)
       return
     }
-
     const lower = value.toLowerCase()
     const baseList = activeStore === 'drugstore'
       ? SUGGESTIONS_DRUGSTORE
@@ -409,7 +313,6 @@ export default function ShoppingList() {
       .map(i => i.name)
 
     const allSuggestions = [...new Set([...baseList, ...existingNames])]
-
     const filtered = allSuggestions
       .filter(s => s.toLowerCase().includes(lower) && s.toLowerCase() !== lower)
       .slice(0, 6)
@@ -429,38 +332,47 @@ export default function ShoppingList() {
            'salat','champignons','avocado','erdbeeren','trauben','zitronen'
           ].some(v => lower.includes(v))) {
         setNewCategory('Obst & Gemüse')
-      } else if (['hähnchen','hackfleisch','lachs','thunfisch','speck','schinken'
+      } else if (['hähnchen','hackfleisch','lachs','thunfisch','speck','schinken',
+                  'steak','filet','garnelen','fisch'
           ].some(v => lower.includes(v))) {
         setNewCategory('Fleisch & Fisch')
       } else if (['milch','joghurt','quark','sahne','eier','käse','mozzarella',
-                  'parmesan','frischkäse','schmand'
+                  'parmesan','frischkäse','schmand','butter','skyr'
           ].some(v => lower.includes(v))) {
         setNewCategory('Kühlregal')
-      } else if (['spaghetti','penne','nudel'].some(v => lower.includes(v))) {
+      } else if (['spaghetti','penne','nudel','fusilli','rigatoni','tagliatelle'
+          ].some(v => lower.includes(v))) {
         setNewCategory('Nudeln')
-      } else if (['reis','couscous','quinoa','haferflocken'].some(v => lower.includes(v))) {
+      } else if (['reis','couscous','quinoa','haferflocken','bulgur','hirse'
+          ].some(v => lower.includes(v))) {
         setNewCategory('Reis & Getreide')
-      } else if (['brot','brötchen','toast','baguette'].some(v => lower.includes(v))) {
+      } else if (['brot','brötchen','toast','baguette','ciabatta'
+          ].some(v => lower.includes(v))) {
         setNewCategory('Brot & Backwaren')
-      } else if (['dose','kichererbsen','linsen','kidney','kokosmilch'
+      } else if (['dose','kichererbsen','linsen','kidney','kokosmilch','passata'
           ].some(v => lower.includes(v))) {
         setNewCategory('Konserven')
-      } else if (['saft','wasser','mineralwasser'].some(v => lower.includes(v))) {
+      } else if (['saft','wasser','mineralwasser','cola','tee','kaffee'
+          ].some(v => lower.includes(v))) {
         setNewCategory('Getränke')
+      } else if (['tk','tiefkühl','eis','eiscreme','pommes'
+          ].some(v => lower.includes(v))) {
+        setNewCategory('Tiefkühl')
       }
     } else {
       if (['shampoo','conditioner','duschgel','seife','zahnpasta','deo',
-           'bodylotion','gesichtscreme','sonnencreme','rasierschaum'
+           'bodylotion','gesichtscreme','sonnencreme','rasierschaum','parfüm'
           ].some(v => lower.includes(v))) {
         setNewCategory('Körperpflege')
       } else if (['waschmittel','weichspüler','spülmittel','reiniger',
                   'müllbeutel','küchenrolle','toilettenpapier','taschentücher'
           ].some(v => lower.includes(v))) {
         setNewCategory('Haushalt')
-      } else if (['ibuprofen','paracetamol','pflaster','nasenspray','hustensaft'
+      } else if (['ibuprofen','paracetamol','pflaster','nasenspray','vitamin'
           ].some(v => lower.includes(v))) {
         setNewCategory('Gesundheit')
-      } else if (['windeln','feuchttücher','babynahrung'].some(v => lower.includes(v))) {
+      } else if (['windeln','feuchttücher','babynahrung','babyshampoo'
+          ].some(v => lower.includes(v))) {
         setNewCategory('Baby')
       }
     }
@@ -469,8 +381,16 @@ export default function ShoppingList() {
   const handleAddItem = async () => {
     if (!newItem.trim()) return
     const defaultCat = activeStore === 'drugstore' ? 'Körperpflege' : 'Sonstiges'
-    await addManualItem(newItem.trim(), null, null, newCategory || defaultCat, activeStore)
+    await addManualItem(
+      newItem.trim(),
+      newAmount ? parseFloat(newAmount) : null,
+      newUnit || null,
+      newCategory || defaultCat,
+      activeStore
+    )
     setNewItem('')
+    setNewAmount('')
+    setNewUnit('')
     setNewCategory('')
     setShowAddForm(false)
     setShowSuggestions(false)
@@ -501,9 +421,11 @@ export default function ShoppingList() {
         position: 'sticky', top: 0, zIndex: 10,
         background: 'var(--color-bg)'
       }}>
+
+        {/* Titel + Neu laden */}
         <div style={{
           display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', marginBottom: '12px'
+          justifyContent: 'space-between', marginBottom: '10px'
         }}>
           <div>
             <h1 style={{
@@ -544,22 +466,65 @@ export default function ShoppingList() {
           )}
         </div>
 
+        {/* Schieberegler */}
+        {activeStore === 'supermarket' && (
+          <div style={{
+            background: 'var(--color-surface)',
+            border: '0.5px solid var(--color-border)',
+            borderRadius: '12px', padding: '10px 14px',
+            marginBottom: '10px'
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center',
+              justifyContent: 'space-between', marginBottom: '6px'
+            }}>
+              <span style={{fontSize: '12px', color: 'var(--color-text-muted)'}}>
+                Einkaufen bis einschließlich
+              </span>
+              <span style={{
+                fontSize: '12px', fontWeight: '600',
+                color: 'var(--color-accent)'
+              }}>
+                {DAYS_SHORT[untilDay]}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0} max={6} step={1}
+              value={untilDay}
+              onChange={e => setUntilDay(Number(e.target.value))}
+              style={{
+                width: '100%', height: '4px',
+                accentColor: 'var(--color-accent)',
+                cursor: 'pointer'
+              }}
+            />
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', marginTop: '4px'
+            }}>
+              {DAYS_SHORT.map((d, i) => (
+                <span key={i} style={{
+                  fontSize: '9px',
+                  color: i <= untilDay ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                  fontWeight: i === untilDay ? '600' : '400'
+                }}>
+                  {d}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Store Tabs */}
         <div style={{display: 'flex', gap: '6px', marginBottom: '10px'}}>
           <button
             onClick={() => setActiveStore('supermarket')}
             style={{
-              flex: 1, padding: '9px',
-              borderRadius: '10px', cursor: 'pointer',
-              background: activeStore === 'supermarket'
-                ? 'var(--color-accent)'
-                : 'var(--color-surface)',
+              flex: 1, padding: '9px', borderRadius: '10px', cursor: 'pointer',
+              background: activeStore === 'supermarket' ? 'var(--color-accent)' : 'var(--color-surface)',
               color: activeStore === 'supermarket' ? '#fff' : 'var(--color-text-muted)',
-              fontSize: '13px',
-              fontWeight: activeStore === 'supermarket' ? '500' : '400',
-              border: activeStore === 'supermarket'
-                ? 'none'
-                : '0.5px solid var(--color-border)',
+              fontSize: '13px', fontWeight: activeStore === 'supermarket' ? '500' : '400',
+              border: activeStore === 'supermarket' ? 'none' : '0.5px solid var(--color-border)',
               transition: 'all 0.15s'
             }}
           >
@@ -567,9 +532,7 @@ export default function ShoppingList() {
             {items.filter(i => !i.is_checked && (showBasics || !isBasicIngredient(i.name))).length > 0 && (
               <span style={{
                 marginLeft: '6px', fontSize: '11px',
-                background: activeStore === 'supermarket'
-                  ? 'rgba(255,255,255,0.25)'
-                  : 'var(--color-surface-2)',
+                background: activeStore === 'supermarket' ? 'rgba(255,255,255,0.25)' : 'var(--color-surface-2)',
                 padding: '1px 6px', borderRadius: '20px'
               }}>
                 {items.filter(i => !i.is_checked && (showBasics || !isBasicIngredient(i.name))).length}
@@ -579,15 +542,11 @@ export default function ShoppingList() {
           <button
             onClick={() => setActiveStore('drugstore')}
             style={{
-              flex: 1, padding: '9px',
-              borderRadius: '10px', cursor: 'pointer',
+              flex: 1, padding: '9px', borderRadius: '10px', cursor: 'pointer',
               background: activeStore === 'drugstore' ? '#5F5E5A' : 'var(--color-surface)',
               color: activeStore === 'drugstore' ? '#fff' : 'var(--color-text-muted)',
-              fontSize: '13px',
-              fontWeight: activeStore === 'drugstore' ? '500' : '400',
-              border: activeStore === 'drugstore'
-                ? 'none'
-                : '0.5px solid var(--color-border)',
+              fontSize: '13px', fontWeight: activeStore === 'drugstore' ? '500' : '400',
+              border: activeStore === 'drugstore' ? 'none' : '0.5px solid var(--color-border)',
               transition: 'all 0.15s'
             }}
           >
@@ -595,9 +554,7 @@ export default function ShoppingList() {
             {drugstoreItems.filter(i => !i.is_checked).length > 0 && (
               <span style={{
                 marginLeft: '6px', fontSize: '11px',
-                background: activeStore === 'drugstore'
-                  ? 'rgba(255,255,255,0.25)'
-                  : 'var(--color-surface-2)',
+                background: activeStore === 'drugstore' ? 'rgba(255,255,255,0.25)' : 'var(--color-surface-2)',
                 padding: '1px 6px', borderRadius: '20px'
               }}>
                 {drugstoreItems.filter(i => !i.is_checked).length}
@@ -630,6 +587,8 @@ export default function ShoppingList() {
             marginBottom: '10px',
             display: 'flex', flexDirection: 'column', gap: '7px'
           }}>
+
+            {/* Name + Autocomplete */}
             <div style={{position: 'relative'}}>
               <input
                 value={newItem}
@@ -654,14 +613,12 @@ export default function ShoppingList() {
                   outline: 'none', boxSizing: 'border-box'
                 }}
               />
-
               {showSuggestions && (
                 <div style={{
                   position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
                   background: 'var(--color-surface)',
                   border: '0.5px solid var(--color-border)',
-                  borderTop: 'none',
-                  borderRadius: '0 0 9px 9px',
+                  borderTop: 'none', borderRadius: '0 0 9px 9px',
                   overflow: 'hidden'
                 }}>
                   {suggestions.map((suggestion, idx) => {
@@ -674,13 +631,9 @@ export default function ShoppingList() {
                         onMouseDown={() => handleSelectSuggestion(suggestion)}
                         style={{
                           width: '100%', textAlign: 'left',
-                          padding: '10px 12px',
-                          background: 'none', border: 'none',
-                          borderTop: idx > 0
-                            ? '0.5px solid var(--color-border)'
-                            : 'none',
-                          cursor: 'pointer', fontSize: '14px',
-                          color: 'var(--color-text)',
+                          padding: '10px 12px', background: 'none', border: 'none',
+                          borderTop: idx > 0 ? '0.5px solid var(--color-border)' : 'none',
+                          cursor: 'pointer', fontSize: '14px', color: 'var(--color-text)',
                           display: 'flex', alignItems: 'center', gap: '8px'
                         }}
                       >
@@ -706,6 +659,43 @@ export default function ShoppingList() {
               )}
             </div>
 
+            {/* Menge + Einheit */}
+            <div style={{display: 'flex', gap: '7px'}}>
+              <input
+                value={newAmount}
+                onChange={e => setNewAmount(e.target.value)}
+                placeholder="Menge"
+                type="number"
+                min="0"
+                step="0.1"
+                style={{
+                  width: '80px', padding: '9px 10px',
+                  background: 'var(--color-surface-2)',
+                  border: '0.5px solid var(--color-border)',
+                  borderRadius: '9px', fontSize: '13px',
+                  color: 'var(--color-text)', outline: 'none',
+                  textAlign: 'center', flexShrink: 0,
+                  boxSizing: 'border-box'
+                }}
+              />
+              <select
+                value={newUnit}
+                onChange={e => setNewUnit(e.target.value)}
+                style={{
+                  flex: 1, padding: '9px 8px',
+                  background: 'var(--color-surface-2)',
+                  border: '0.5px solid var(--color-border)',
+                  borderRadius: '9px', fontSize: '13px',
+                  color: newUnit ? 'var(--color-text)' : 'var(--color-text-muted)',
+                  outline: 'none'
+                }}
+              >
+                <option value="">Einheit (optional)</option>
+                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+
+            {/* Kategorie */}
             <select
               value={newCategory}
               onChange={e => setNewCategory(e.target.value)}
@@ -740,6 +730,8 @@ export default function ShoppingList() {
                 onClick={() => {
                   setShowAddForm(false)
                   setNewItem('')
+                  setNewAmount('')
+                  setNewUnit('')
                   setShowSuggestions(false)
                 }}
                 style={{
@@ -801,7 +793,7 @@ export default function ShoppingList() {
         )}
       </div>
 
-      {/* Offline-Banner ← HIER einfügen */}
+      {/* Offline Banner */}
       {isOffline && (
         <div style={{
           margin: '0 16px 10px',
@@ -812,12 +804,12 @@ export default function ShoppingList() {
           display: 'flex', alignItems: 'center', gap: '8px',
           fontSize: '13px', color: '#92400e'
         }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#92400e" strokeWidth="2" strokeLinecap="round">
-            <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.56 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="#92400e" strokeWidth="2" strokeLinecap="round">
+            <line x1="1" y1="1" x2="23" y2="23"/>
+            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.56 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>
           </svg>
-          <span>
-            Offline — Änderungen werden beim nächsten Mal synchronisiert
-          </span>
+          <span>Offline — Änderungen werden synchronisiert</span>
         </div>
       )}
 
@@ -871,9 +863,7 @@ export default function ShoppingList() {
                   }}>
                     <span style={{
                       fontSize: '11px', fontWeight: '500',
-                      color: allGroupDone
-                        ? 'var(--color-text-muted)'
-                        : 'var(--color-text)',
+                      color: allGroupDone ? 'var(--color-text-muted)' : 'var(--color-text)',
                       textTransform: 'uppercase', letterSpacing: '0.4px'
                     }}>
                       {category}
@@ -896,6 +886,7 @@ export default function ShoppingList() {
                       }}>
                         <SwipeItem
                           item={item}
+                          accentColor={accentColor}
                           onToggle={(checked) => toggleItem(item.id, checked, activeStore)}
                           onDelete={() => deleteItem(item.id, activeStore)}
                         />
@@ -912,6 +903,7 @@ export default function ShoppingList() {
                       }}>
                         <SwipeItem
                           item={item}
+                          accentColor={accentColor}
                           onToggle={(checked) => toggleItem(item.id, checked, activeStore)}
                           onDelete={() => deleteItem(item.id, activeStore)}
                         />
