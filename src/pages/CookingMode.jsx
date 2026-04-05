@@ -1,603 +1,478 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useRecipeStore } from '../store/useRecipeStore'
 import { useAuthStore } from '../store/useAuthStore'
 import { useCookHistoryStore } from '../store/useCookHistoryStore'
-import { ArrowLeft, ArrowRight, Check, X, Timer, Play, Pause, RotateCcw, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Play, Pause, RotateCcw, Timer, X, Users } from 'lucide-react'
+import { toast } from '../components/Toast'
 
-const TIMER_PRESETS = [5, 10, 15, 20, 30]
+// Erkennt Zeitangaben im Text: "10 Minuten", "2 Min", "1 Stunde", "30 Sek"
+const extractTimers = (text) => {
+  const timers = []
+  const patterns = [
+    { regex: /(\d+)\s*(?:Stunden?|h)\s*(?:und\s*)?(\d+)\s*(?:Minuten?|Min\.?|min)/gi, fn: (m) => parseInt(m[1]) * 3600 + parseInt(m[2]) * 60, label: (m) => m[1] + 'h ' + m[2] + 'min' },
+    { regex: /(\d+)\s*(?:Stunden?|h)/gi, fn: (m) => parseInt(m[1]) * 3600, label: (m) => m[1] + ' Std' },
+    { regex: /(\d+)\s*(?:Minuten?|Min\.?|min)/gi, fn: (m) => parseInt(m[1]) * 60, label: (m) => m[1] + ' Min' },
+    { regex: /(\d+)\s*(?:Sekunden?|Sek\.?|sec)/gi, fn: (m) => parseInt(m[1]), label: (m) => m[1] + ' Sek' },
+  ]
 
-function TimerWidget() {
-  const [seconds, setSeconds] = useState(0)
-  const [inputMinutes, setInputMinutes] = useState('')
-  const [running, setRunning] = useState(false)
-  const [finished, setFinished] = useState(false)
-  const intervalRef = useRef(null)
-
-  useEffect(() => {
-    if (running && seconds > 0) {
-      intervalRef.current = setInterval(() => {
-        setSeconds(s => {
-          if (s <= 1) {
-            clearInterval(intervalRef.current)
-            setRunning(false)
-            setFinished(true)
-            if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300])
-            return 0
-          }
-          return s - 1
-        })
-      }, 1000)
+  for (const { regex, fn, label } of patterns) {
+    let match
+    regex.lastIndex = 0
+    while ((match = regex.exec(text)) !== null) {
+      const seconds = fn(match)
+      if (seconds > 0 && seconds <= 7200) {
+        timers.push({ seconds, label: label(match), startIdx: match.index })
+      }
     }
-    return () => clearInterval(intervalRef.current)
-  }, [running])
-
-  const start = (mins) => {
-    clearInterval(intervalRef.current)
-    setSeconds(mins * 60)
-    setRunning(true)
-    setFinished(false)
   }
 
-  const handleCustomStart = () => {
-    const mins = parseInt(inputMinutes)
-    if (mins > 0) { start(mins); setInputMinutes('') }
-  }
+  // Deduplizieren
+  return timers.filter((t, i, arr) =>
+    arr.findIndex(x => Math.abs(x.startIdx - t.startIdx) < 5) === i
+  )
+}
 
-  const toggle = () => {
-    if (finished) { setFinished(false); setSeconds(0); return }
-    setRunning(r => !r)
-  }
+// Hebt Zeitangaben im Text hervor
+const HighlightedText = ({ text, onTimerClick, activeTimerIdx }) => {
+  const parts = []
+  const regex = /(\d+\s*(?:Stunden?|h(?:\s+und\s+\d+\s*(?:Minuten?|Min\.?))?|Minuten?|Min\.?|min|Sekunden?|Sek\.?|sec))/gi
+  let last = 0
+  let timerCount = 0
+  let match
 
-  const reset = () => {
-    clearInterval(intervalRef.current)
-    setRunning(false)
-    setFinished(false)
-    setSeconds(0)
+  regex.lastIndex = 0
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) {
+      parts.push({ type: 'text', content: text.slice(last, match.index) })
+    }
+    const idx = timerCount
+    parts.push({ type: 'timer', content: match[0], idx })
+    timerCount++
+    last = match.index + match[0].length
   }
-
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  const display = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
-  const isActive = seconds > 0 || running || finished
+  if (last < text.length) {
+    parts.push({ type: 'text', content: text.slice(last) })
+  }
 
   return (
-    <div style={{
-      background: finished ? 'var(--color-accent-soft)' : 'var(--color-surface-2)',
-      borderRadius: '16px', padding: '16px',
-      border: finished ? '1.5px solid var(--color-accent)' : '0.5px solid var(--color-border)',
-      transition: 'all 0.3s'
-    }}>
-      <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px'}}>
-        <Timer size={14} color="var(--color-accent)" />
-        <span style={{fontSize: '11px', fontWeight: '600', color: 'var(--color-accent)', textTransform: 'uppercase', letterSpacing: '0.5px'}}>
-          Timer
-        </span>
-        {finished && (
-          <span style={{marginLeft: 'auto', fontSize: '12px', fontWeight: '600', color: 'var(--color-accent)'}}>
-            ✓ Fertig!
-          </span>
-        )}
-      </div>
-
-      {!isActive && (
-        <>
-          <div style={{display: 'flex', gap: '5px', marginBottom: '10px', flexWrap: 'wrap'}}>
-            {TIMER_PRESETS.map(min => (
-              <button key={min} onClick={() => start(min)} style={{
-                padding: '5px 10px', borderRadius: '20px',
-                background: 'var(--color-surface)',
-                border: '0.5px solid var(--color-border)',
-                cursor: 'pointer', fontSize: '12px',
-                color: 'var(--color-text-muted)', fontWeight: '500'
-              }}>
-                {min} min
-              </button>
-            ))}
-          </div>
-          <div style={{display: 'flex', gap: '6px', marginBottom: '12px'}}>
-            <input
-              type="number" value={inputMinutes}
-              onChange={e => setInputMinutes(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleCustomStart()}
-              placeholder="Eigene Zeit (min)" min="1" max="999"
-              style={{
-                flex: 1, padding: '8px 12px',
-                background: 'var(--color-surface)',
-                border: '0.5px solid var(--color-border)',
-                borderRadius: '10px', fontSize: '13px',
-                color: 'var(--color-text)', outline: 'none'
-              }}
-            />
-            <button onClick={handleCustomStart} style={{
-              padding: '8px 14px',
-              background: 'var(--color-accent)', color: '#fff',
-              border: 'none', borderRadius: '10px',
-              cursor: 'pointer', fontSize: '13px', fontWeight: '500'
-            }}>
-              Start
-            </button>
-          </div>
-        </>
-      )}
-
-      {isActive && (
-        <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-          <span style={{
-            fontSize: '36px', fontWeight: '700',
-            letterSpacing: '-1px', fontVariantNumeric: 'tabular-nums',
-            color: finished ? 'var(--color-accent)' : 'var(--color-text)'
-          }}>
-            {finished ? '00:00' : display}
-          </span>
-          <div style={{display: 'flex', gap: '6px'}}>
-            <button onClick={toggle} style={{
-              width: '38px', height: '38px', borderRadius: '50%',
-              background: 'var(--color-accent)', color: '#fff',
+    <span>
+      {parts.map((part, i) =>
+        part.type === 'text' ? (
+          <span key={i}>{part.content}</span>
+        ) : (
+          <button
+            key={i}
+            onClick={() => onTimerClick(part.idx)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '3px',
+              padding: '1px 7px', borderRadius: '20px',
+              background: activeTimerIdx === part.idx
+                ? 'var(--color-accent)'
+                : 'var(--color-accent-soft)',
+              color: activeTimerIdx === part.idx
+                ? '#fff'
+                : 'var(--color-accent-text)',
               border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              {finished ? <Check size={18} /> : running ? <Pause size={16} /> : <Play size={16} />}
-            </button>
-            <button onClick={reset} style={{
-              width: '38px', height: '38px', borderRadius: '50%',
-              background: 'var(--color-surface)',
-              border: '0.5px solid var(--color-border)',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--color-text-muted)'
-            }}>
-              <RotateCcw size={15} />
-            </button>
-          </div>
-        </div>
+              fontSize: 'inherit', fontWeight: '500',
+              margin: '0 1px', transition: 'all 0.15s'
+            }}
+          >
+            <Timer size={11} />
+            {part.content}
+          </button>
+        )
       )}
-
-      {isActive && !finished && (
-        <div style={{marginTop: '10px'}}>
-          <div style={{height: '3px', background: 'var(--color-surface)', borderRadius: '2px', overflow: 'hidden'}}>
-            <div style={{
-              height: '100%', background: 'var(--color-accent)',
-              borderRadius: '2px',
-              width: `${100 - (seconds / (Math.ceil(seconds / 60) * 60)) * 100}%`,
-              transition: 'width 1s linear'
-            }} />
-          </div>
-        </div>
-      )}
-    </div>
+    </span>
   )
 }
 
 export default function CookingMode() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { recipes } = useRecipeStore()
-  const { household } = useAuthStore()
-  const { addEntry } = useCookHistoryStore()
-  const recipe = recipes.find(r => r.id === id)
+  const household = useAuthStore(s => s.household)
+  const { recipes, fetchRecipeDetails } = useRecipeStore()
+  const { addEntry: addHistory } = useCookHistoryStore()
 
   const [currentStep, setCurrentStep] = useState(0)
-  const [completedSteps, setCompletedSteps] = useState(new Set())
-  const [done, setDone] = useState(false)
-  const [showTimer, setShowTimer] = useState(false)
-  const [cookNotes, setCookNotes] = useState('')
-  const [saved, setSaved] = useState(false)
-
-  // Portionsanpassung
   const [servings, setServings] = useState(null)
+  const [completed, setCompleted] = useState(false)
+
+  // Timer States
+  const [timerSeconds, setTimerSeconds] = useState(0)
+  const [timerRunning, setTimerRunning] = useState(false)
+  const [timerLabel, setTimerLabel] = useState('')
+  const [activeTimerIdx, setActiveTimerIdx] = useState(null)
+  const timerRef = useRef(null)
+
+  const recipe = recipes.find(r => r.id === id)
+  const steps = recipe?.recipe_steps?.sort((a, b) => a.step_number - b.step_number) || []
 
   useEffect(() => {
-    if (recipe) setServings(recipe.servings || 2)
-  }, [recipe])
+    if (id) fetchRecipeDetails(id)
+  }, [id])
 
   useEffect(() => {
-    let wakeLock = null
-    if ('wakeLock' in navigator) {
-      navigator.wakeLock.request('screen')
-        .then(wl => { wakeLock = wl })
-        .catch(() => {})
+    if (recipe && servings === null) {
+      setServings(recipe.servings || 2)
     }
-    return () => { if (wakeLock) wakeLock.release() }
-  }, [])
+  }, [recipe?.id])
 
-  if (!recipe) return (
-    <div style={{padding: '32px', textAlign: 'center', color: 'var(--color-text-muted)'}}>
-      Rezept nicht gefunden
+  // Timer Logik
+  useEffect(() => {
+    if (timerRunning && timerSeconds > 0) {
+      timerRef.current = setInterval(() => {
+        setTimerSeconds(s => {
+          if (s <= 1) {
+            setTimerRunning(false)
+            clearInterval(timerRef.current)
+            // Vibration wenn fertig
+            if (navigator.vibrate) navigator.vibrate([300, 100, 300])
+            toast.success('Timer abgelaufen: ' + timerLabel)
+            return 0
+          }
+          return s - 1
+        })
+      }, 1000)
+    } else {
+      clearInterval(timerRef.current)
+    }
+    return () => clearInterval(timerRef.current)
+  }, [timerRunning])
+
+  const startTimer = (seconds, label) => {
+    clearInterval(timerRef.current)
+    setTimerSeconds(seconds)
+    setTimerLabel(label)
+    setTimerRunning(true)
+  }
+
+  const handleTimerClick = (stepText, timerIdx) => {
+    const timers = extractTimers(stepText)
+    if (timers[timerIdx]) {
+      const t = timers[timerIdx]
+      setActiveTimerIdx(timerIdx)
+      startTimer(t.seconds, t.label)
+      toast.info('Timer gestartet: ' + t.label)
+    }
+  }
+
+  const formatTime = (s) => {
+    const h = Math.floor(s / 3600)
+    const m = Math.floor((s % 3600) / 60)
+    const sec = s % 60
+    if (h > 0) return h + ':' + String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0')
+    return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0')
+  }
+
+  const scaleAmount = (amount) => {
+    if (!amount || !recipe?.servings || servings === null) return amount
+    const factor = servings / recipe.servings
+    const scaled = amount * factor
+    return scaled % 1 === 0 ? scaled : Math.round(scaled * 10) / 10
+  }
+
+  const handleNext = () => {
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(s => s + 1)
+      setActiveTimerIdx(null)
+    } else {
+      handleFinish()
+    }
+  }
+
+  const handlePrev = () => {
+    if (currentStep > 0) {
+      setCurrentStep(s => s - 1)
+      setActiveTimerIdx(null)
+    }
+  }
+
+  const handleFinish = async () => {
+    setCompleted(true)
+    if (household && recipe) {
+      await addHistory(recipe.id, recipe.name, household.id, servings)
+    }
+  }
+
+  if (!recipe || servings === null) return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      height: '80vh', color: 'var(--color-text-muted)'
+    }}>
+      Lädt...
     </div>
   )
 
-  const steps = [...(recipe.recipe_steps || [])].sort((a, b) => a.step_number - b.step_number)
-
-  if (!steps.length) return (
+  if (completed) return (
     <div style={{
-      padding: '32px', textAlign: 'center',
-      background: 'var(--color-bg)', minHeight: '100dvh',
       display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center'
+      alignItems: 'center', justifyContent: 'center',
+      minHeight: '80vh', padding: '32px', textAlign: 'center'
     }}>
-      <div style={{fontSize: '48px', marginBottom: '12px'}}>📝</div>
-      <p style={{color: 'var(--color-text-muted)', marginBottom: '16px'}}>
-        Keine Zubereitungsschritte vorhanden
-      </p>
-      <button onClick={() => navigate(`/recipes/${id}`)} style={{
-        padding: '10px 20px', background: 'var(--color-accent)',
-        color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer'
+      <div style={{fontSize: '56px', marginBottom: '16px'}}>🎉</div>
+      <h2 style={{
+        fontSize: '22px', fontWeight: '600',
+        color: 'var(--color-text)', marginBottom: '8px'
       }}>
-        Schritte hinzufügen
+        Guten Appetit!
+      </h2>
+      <p style={{
+        fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '32px'
+      }}>
+        {recipe.name} für {servings} Personen
+      </p>
+      <button
+        onClick={() => navigate('/recipes')}
+        style={{
+          padding: '13px 32px',
+          background: 'var(--color-accent)', color: '#fff',
+          border: 'none', borderRadius: '12px', cursor: 'pointer',
+          fontSize: '15px', fontWeight: '500'
+        }}
+      >
+        Zurück zu Rezepten
       </button>
     </div>
   )
 
-  // Skalierungsfaktor
-  const factor = servings / (recipe.servings || 2)
-
-  const formatAmount = (amount) => {
-    if (!amount) return null
-    const scaled = Math.round(amount * factor * 10) / 10
-    return scaled % 1 === 0 ? String(scaled) : scaled.toFixed(1)
-  }
-
-  const step = steps[currentStep]
-  const isLast = currentStep === steps.length - 1
-  const progress = ((currentStep + 1) / steps.length) * 100
-
-  const markComplete = async () => {
-    setCompletedSteps(prev => new Set([...prev, currentStep]))
-    if (isLast) {
-      setDone(true)
-      if (household && !saved) {
-        setSaved(true)
-        await addEntry(household.id, recipe.id, recipe.name, servings)
-      }
-    } else {
-      setCurrentStep(s => s + 1)
-    }
-  }
-
-  if (done) return (
-    <div style={{
-      minHeight: '100dvh', display: 'flex',
-      flexDirection: 'column', background: 'var(--color-bg)'
-    }}>
-      <div style={{
-        flex: 1, display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        padding: '32px', textAlign: 'center'
-      }}>
-        <div style={{
-          width: '80px', height: '80px', borderRadius: '50%',
-          background: 'var(--color-accent-soft)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          marginBottom: '20px'
-        }}>
-          <Check size={40} color="var(--color-accent)" />
-        </div>
-        <h2 style={{fontSize: '24px', fontWeight: '700', color: 'var(--color-text)', marginBottom: '6px'}}>
-          Guten Appetit! 🍽️
-        </h2>
-        <p style={{fontSize: '15px', color: 'var(--color-text-muted)', marginBottom: '4px'}}>
-          {recipe.name}
-        </p>
-        <p style={{fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '24px'}}>
-          {steps.length} Schritte · {servings} Portionen · automatisch gespeichert
-        </p>
-
-        <div style={{width: '100%', maxWidth: '340px', marginBottom: '24px'}}>
-          <textarea
-            value={cookNotes}
-            onChange={e => setCookNotes(e.target.value)}
-            placeholder="Notiz zum Gericht (optional)..."
-            rows={3}
-            style={{
-              width: '100%', padding: '12px 14px',
-              background: 'var(--color-surface)',
-              border: '0.5px solid var(--color-border)',
-              borderRadius: '12px', fontSize: '14px',
-              color: 'var(--color-text)', outline: 'none',
-              resize: 'none', boxSizing: 'border-box', lineHeight: '1.5'
-            }}
-          />
-        </div>
-
-        <div style={{display: 'flex', gap: '10px', width: '100%', maxWidth: '340px'}}>
-          <button onClick={() => navigate('/planner')} style={{
-            flex: 1, padding: '13px',
-            background: 'var(--color-surface)',
-            border: '0.5px solid var(--color-border)',
-            borderRadius: '12px', cursor: 'pointer',
-            fontSize: '14px', color: 'var(--color-text-muted)'
-          }}>
-            Zum Planer
-          </button>
-          <button onClick={() => navigate('/recipes')} style={{
-            flex: 1, padding: '13px',
-            background: 'var(--color-accent)', color: '#fff',
-            border: 'none', borderRadius: '12px',
-            cursor: 'pointer', fontSize: '14px', fontWeight: '500'
-          }}>
-            Zu Rezepten
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+  const currentStepData = steps[currentStep]
+  const stepTimers = currentStepData ? extractTimers(currentStepData.description) : []
+  const progress = steps.length > 0 ? ((currentStep) / steps.length) * 100 : 0
 
   return (
     <div style={{
-      minHeight: '100dvh', display: 'flex',
-      flexDirection: 'column', background: 'var(--color-bg)'
+      display: 'flex', flexDirection: 'column',
+      minHeight: '100dvh', background: 'var(--color-bg)'
     }}>
 
       {/* Header */}
       <div style={{
         padding: '12px 16px',
-        background: 'var(--color-surface)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         borderBottom: '0.5px solid var(--color-border)',
-        display: 'flex', alignItems: 'center', gap: '12px'
+        position: 'sticky', top: 0, zIndex: 10,
+        background: 'var(--color-bg)'
       }}>
         <button onClick={() => navigate(-1)} style={{
           background: 'none', border: 'none', cursor: 'pointer',
-          color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center'
+          color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px',
+          fontSize: '14px'
         }}>
-          <X size={20} />
+          <X size={18} /> Beenden
         </button>
-        <div style={{flex: 1, minWidth: 0}}>
-          <div style={{
-            fontSize: '13px', fontWeight: '600', color: 'var(--color-text)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-          }}>
-            {recipe.name}
-          </div>
-          <div style={{fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '1px'}}>
-            Schritt {currentStep + 1} von {steps.length}
-          </div>
+        <div style={{fontSize: '13px', fontWeight: '500', color: 'var(--color-text)'}}>
+          {currentStep + 1} / {steps.length}
         </div>
-        <button onClick={() => setShowTimer(t => !t)} style={{
-          display: 'flex', alignItems: 'center', gap: '5px',
-          padding: '6px 10px', borderRadius: '10px',
-          background: showTimer ? 'var(--color-accent-soft)' : 'var(--color-surface-2)',
-          border: '0.5px solid var(--color-border)',
-          cursor: 'pointer', fontSize: '12px',
-          color: showTimer ? 'var(--color-accent)' : 'var(--color-text-muted)'
-        }}>
-          <Timer size={14} /> Timer
-        </button>
+        {/* Portionen */}
+        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+          <button onClick={() => setServings(s => Math.max(1, s - 1))} style={{
+            width: '26px', height: '26px', borderRadius: '7px',
+            background: 'var(--color-surface-2)',
+            border: '0.5px solid var(--color-border)',
+            cursor: 'pointer', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            fontSize: '16px', color: 'var(--color-text)'
+          }}>−</button>
+          <span style={{fontSize: '13px', fontWeight: '500', color: 'var(--color-text)'}}>
+            {servings}P
+          </span>
+          <button onClick={() => setServings(s => s + 1)} style={{
+            width: '26px', height: '26px', borderRadius: '7px',
+            background: 'var(--color-surface-2)',
+            border: '0.5px solid var(--color-border)',
+            cursor: 'pointer', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            fontSize: '16px', color: 'var(--color-text)'
+          }}>+</button>
+        </div>
       </div>
 
-      {/* Progress Bar */}
+      {/* Fortschrittsbalken */}
       <div style={{height: '3px', background: 'var(--color-surface-2)'}}>
         <div style={{
           height: '100%', background: 'var(--color-accent)',
-          width: `${progress}%`, transition: 'width 0.3s ease'
+          width: progress + '%', transition: 'width 0.3s ease'
         }} />
       </div>
 
-      {/* Content */}
-      <div style={{flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px'}}>
+      {/* Rezeptname */}
+      <div style={{
+        padding: '14px 16px 0',
+        fontSize: '13px', color: 'var(--color-text-muted)'
+      }}>
+        {recipe.name}
+        {recipe.cook_time && (
+          <span style={{marginLeft: '8px', color: 'var(--color-accent)'}}>
+            · {recipe.cook_time} Min
+          </span>
+        )}
+      </div>
 
-        {showTimer && <TimerWidget />}
+      {/* Aktueller Schritt */}
+      <div style={{flex: 1, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '14px'}}>
 
-        {/* Portionsanpassung */}
-        <div style={{
-          background: 'var(--color-surface)',
-          borderRadius: '14px',
-          border: '0.5px solid var(--color-border)',
-          padding: '10px 14px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-        }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            fontSize: '13px', color: 'var(--color-text-muted)'
-          }}>
-            <Users size={14} />
-            Portionen
-            {servings !== recipe.servings && (
-              <span style={{
-                fontSize: '10px', padding: '1px 6px',
-                background: 'var(--color-accent-soft)',
-                color: 'var(--color-accent-text)',
-                borderRadius: '20px'
-              }}>
-                Rezept: {recipe.servings}
-              </span>
-            )}
-          </div>
-          <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-            <button
-              onClick={() => setServings(s => Math.max(1, s - 1))}
-              style={{
-                width: '28px', height: '28px', borderRadius: '8px',
-                background: 'var(--color-surface-2)',
-                border: '0.5px solid var(--color-border)',
-                cursor: 'pointer', fontSize: '16px', color: 'var(--color-text)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}
-            >−</button>
-            <span style={{
-              fontSize: '16px', fontWeight: '600',
-              color: 'var(--color-text)', minWidth: '20px', textAlign: 'center'
-            }}>
-              {servings}
-            </span>
-            <button
-              onClick={() => setServings(s => s + 1)}
-              style={{
-                width: '28px', height: '28px', borderRadius: '8px',
-                background: 'var(--color-surface-2)',
-                border: '0.5px solid var(--color-border)',
-                cursor: 'pointer', fontSize: '16px', color: 'var(--color-text)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}
-            >+</button>
-          </div>
-        </div>
-
-        {/* Zutaten mit skalierten Mengen */}
-        {recipe.ingredients?.length > 0 && (
+        {currentStepData && (
           <div style={{
             background: 'var(--color-surface)',
-            borderRadius: '14px',
             border: '0.5px solid var(--color-border)',
-            padding: '12px'
+            borderRadius: '16px', padding: '18px',
+            flex: 1
           }}>
             <div style={{
-              fontSize: '11px', fontWeight: '600',
+              fontSize: '11px', fontWeight: '500',
               color: 'var(--color-text-muted)',
               textTransform: 'uppercase', letterSpacing: '0.5px',
-              marginBottom: '10px',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+              marginBottom: '12px'
             }}>
-              <span>Zutaten</span>
-              {servings !== recipe.servings && (
-                <span style={{
-                  fontSize: '10px', color: 'var(--color-accent)',
-                  fontWeight: '500', textTransform: 'none'
-                }}>
-                  angepasst für {servings} Portionen
-                </span>
-              )}
+              Schritt {currentStep + 1}
             </div>
-            <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-              {recipe.ingredients.map((ing, i) => (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '7px 10px',
-                  background: 'var(--color-surface-2)',
-                  borderRadius: '8px'
+            <p style={{
+              fontSize: '17px', lineHeight: '1.7',
+              color: 'var(--color-text)', margin: 0
+            }}>
+              <HighlightedText
+                text={currentStepData.description}
+                onTimerClick={(idx) => handleTimerClick(currentStepData.description, idx)}
+                activeTimerIdx={activeTimerIdx}
+              />
+            </p>
+
+            {/* Zutaten dieses Schritts — optional */}
+            {recipe.ingredients?.length > 0 && (
+              <div style={{marginTop: '16px', paddingTop: '14px', borderTop: '0.5px solid var(--color-border)'}}>
+                <div style={{
+                  fontSize: '10px', fontWeight: '500',
+                  color: 'var(--color-text-muted)',
+                  textTransform: 'uppercase', letterSpacing: '0.5px',
+                  marginBottom: '8px'
                 }}>
-                  <span style={{fontSize: '13px', color: 'var(--color-text)'}}>
-                    {ing.name}
-                  </span>
-                  {(ing.amount || ing.unit) && (
-                    <span style={{
-                      fontSize: '13px',
-                      fontWeight: '700',
-                      color: 'var(--color-text)',
-                      marginLeft: '8px', flexShrink: 0
-                    }}>
-                      ({formatAmount(ing.amount)}{ing.unit ? ` ${ing.unit}` : ''})
-                    </span>
-                  )}
+                  Zutaten ({servings} Portionen)
                 </div>
-              ))}
+                <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
+                  {recipe.ingredients.map((ing, i) => (
+                    <div key={i} style={{
+                      padding: '4px 10px',
+                      background: 'var(--color-surface-2)',
+                      borderRadius: '20px', fontSize: '12px',
+                      color: 'var(--color-text)'
+                    }}>
+                      {scaleAmount(ing.amount)
+                        ? <strong style={{color: 'var(--color-accent)'}}>
+                            {scaleAmount(ing.amount)}{ing.unit ? ' ' + ing.unit : ''}
+                          </strong>
+                        : null
+                      }
+                      {scaleAmount(ing.amount) ? ' ' : ''}{ing.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Timer */}
+        {(timerSeconds > 0 || timerRunning) && (
+          <div style={{
+            background: timerSeconds === 0 ? '#EAF3DE' : 'var(--color-surface)',
+            border: '0.5px solid ' + (timerSeconds === 0 ? '#27500A' : 'var(--color-accent)'),
+            borderRadius: '14px', padding: '14px 16px',
+            display: 'flex', alignItems: 'center', gap: '12px'
+          }}>
+            <div style={{flex: 1}}>
+              <div style={{
+                fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '2px'
+              }}>
+                {timerLabel}
+              </div>
+              <div style={{
+                fontSize: '28px', fontWeight: '600',
+                color: timerSeconds === 0 ? '#27500A' : 'var(--color-accent)',
+                fontVariantNumeric: 'tabular-nums'
+              }}>
+                {formatTime(timerSeconds)}
+              </div>
+            </div>
+            <div style={{display: 'flex', gap: '8px'}}>
+              <button
+                onClick={() => setTimerRunning(r => !r)}
+                style={{
+                  width: '40px', height: '40px', borderRadius: '10px',
+                  background: 'var(--color-accent)', color: '#fff',
+                  border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+              >
+                {timerRunning ? <Pause size={18} /> : <Play size={18} />}
+              </button>
+              <button
+                onClick={() => {
+                  setTimerSeconds(0)
+                  setTimerRunning(false)
+                  setActiveTimerIdx(null)
+                  clearInterval(timerRef.current)
+                }}
+                style={{
+                  width: '40px', height: '40px', borderRadius: '10px',
+                  background: 'var(--color-surface-2)',
+                  border: '0.5px solid var(--color-border)',
+                  cursor: 'pointer', color: 'var(--color-text-muted)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+              >
+                <X size={16} />
+              </button>
             </div>
           </div>
         )}
 
-        {/* Schritt-Übersicht */}
-        <div style={{
-          background: 'var(--color-surface)',
-          borderRadius: '14px',
-          border: '0.5px solid var(--color-border)',
-          overflow: 'hidden'
-        }}>
-          {steps.map((s, i) => (
-            <div key={i} onClick={() => setCurrentStep(i)} style={{
-              display: 'flex', alignItems: 'center', gap: '10px',
-              padding: '9px 12px',
-              background: i === currentStep ? 'var(--color-accent-soft)' : 'transparent',
-              borderTop: i > 0 ? '0.5px solid var(--color-border)' : 'none',
-              cursor: 'pointer'
-            }}>
-              <div style={{
-                width: '22px', height: '22px', borderRadius: '50%',
-                background: completedSteps.has(i)
-                  ? 'var(--color-accent)'
-                  : i === currentStep
-                    ? 'var(--color-accent)'
-                    : 'var(--color-surface-2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0
-              }}>
-                {completedSteps.has(i)
-                  ? <Check size={12} color="#fff" strokeWidth={3} />
-                  : <span style={{
-                      fontSize: '11px', fontWeight: '600',
-                      color: i === currentStep ? '#fff' : 'var(--color-text-muted)'
-                    }}>
-                      {i + 1}
-                    </span>
-                }
-              </div>
-              <span style={{
-                fontSize: '12px',
-                color: completedSteps.has(i) ? 'var(--color-text-muted)' : 'var(--color-text)',
-                textDecoration: completedSteps.has(i) ? 'line-through' : 'none',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                flex: 1, fontWeight: i === currentStep ? '500' : '400'
-              }}>
-                {s.description}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Aktueller Schritt groß */}
-        <div style={{
-          background: 'var(--color-surface)',
-          borderRadius: '16px',
-          border: '0.5px solid var(--color-border)',
-          padding: '20px'
-        }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px'
-          }}>
-            <div style={{
-              width: '32px', height: '32px', borderRadius: '50%',
-              background: 'var(--color-accent)', color: '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '14px', fontWeight: '700', flexShrink: 0
-            }}>
-              {currentStep + 1}
-            </div>
-            <span style={{
-              fontSize: '11px', fontWeight: '600',
-              color: 'var(--color-text-muted)',
-              textTransform: 'uppercase', letterSpacing: '0.5px'
-            }}>
-              Aktueller Schritt
-            </span>
-          </div>
-          <p style={{
-            fontSize: '17px', lineHeight: '1.6',
-            color: 'var(--color-text)', fontWeight: '400'
-          }}>
-            {step.description}
-          </p>
-        </div>
       </div>
 
       {/* Navigation */}
       <div style={{
-        padding: '16px 16px 32px', display: 'flex', gap: '10px',
-        background: 'var(--color-surface)',
-        borderTop: '0.5px solid var(--color-border)'
+        padding: '14px 16px',
+        borderTop: '0.5px solid var(--color-border)',
+        display: 'flex', gap: '10px',
+        position: 'sticky', bottom: 0,
+        background: 'var(--color-bg)'
       }}>
-        {currentStep > 0 && (
-          <button onClick={() => setCurrentStep(s => s - 1)} style={{
-            flex: 1, padding: '14px',
+        <button
+          onClick={handlePrev}
+          disabled={currentStep === 0}
+          style={{
+            width: '48px', height: '52px', borderRadius: '12px',
             background: 'var(--color-surface-2)',
             border: '0.5px solid var(--color-border)',
-            borderRadius: '14px', cursor: 'pointer',
-            fontSize: '14px', color: 'var(--color-text-muted)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
-          }}>
-            <ArrowLeft size={16} /> Zurück
-          </button>
-        )}
-        <button onClick={markComplete} style={{
-          flex: 2, padding: '14px',
-          background: 'var(--color-accent)', color: '#fff',
-          border: 'none', borderRadius: '14px', cursor: 'pointer',
-          fontSize: '15px', fontWeight: '600',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-        }}>
-          {isLast
-            ? <><Check size={18} /> Fertig!</>
-            : <>Schritt erledigt <ArrowRight size={16} /></>
-          }
+            cursor: currentStep === 0 ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: currentStep === 0 ? 'var(--color-border)' : 'var(--color-text)',
+            opacity: currentStep === 0 ? 0.4 : 1,
+            flexShrink: 0
+          }}
+        >
+          <ChevronLeft size={20} />
+        </button>
+
+        <button
+          onClick={handleNext}
+          style={{
+            flex: 1, height: '52px', borderRadius: '12px',
+            background: currentStep === steps.length - 1
+              ? '#22c55e'
+              : 'var(--color-accent)',
+            color: '#fff', border: 'none',
+            cursor: 'pointer', fontSize: '15px', fontWeight: '500',
+            display: 'flex', alignItems: 'center',
+            justifyContent: 'center', gap: '6px',
+            transition: 'background 0.2s'
+          }}
+        >
+          {currentStep === steps.length - 1 ? (
+            <>🎉 Fertig!</>
+          ) : (
+            <>Weiter <ChevronRight size={18} /></>
+          )}
         </button>
       </div>
     </div>
