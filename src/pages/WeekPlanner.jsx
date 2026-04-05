@@ -8,7 +8,10 @@ import { useNavigate } from 'react-router-dom'
 import { SkeletonPlanDay, SkeletonStyles } from '../components/Skeleton'
 import { toast } from '../components/Toast'
 import { ChevronLeft, ChevronRight, Plus, X, ChefHat, FileText, Users, Shuffle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Refrigerator } from 'lucide-react'   
 
+const navigate = useNavigate()
 const DAYS = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag']
 const DAYS_SHORT = ['Mo','Di','Mi','Do','Fr','Sa','So']
 const CATEGORIES = ['Alle', 'Pasta', 'Suppe', 'Salat', 'Fleisch', 'Fisch', 'Vegetarisch', 'Vegan', 'Backen', 'Dessert']
@@ -313,6 +316,21 @@ export default function WeekPlanner() {
                           display: 'flex', alignItems: 'center', gap: '4px'
                         }}
                       >
+                      // Button neben den Navigations-Buttons:
+<button
+  onClick={() => navigate('/fridge')}
+  style={{
+    display: 'flex', alignItems: 'center', gap: '5px',
+    padding: '5px 10px', borderRadius: '8px',
+    background: 'var(--color-accent-soft)',
+    border: '0.5px solid var(--color-accent)',
+    cursor: 'pointer', fontSize: '11px',
+    color: 'var(--color-accent-text)', fontWeight: '500'
+  }}
+>
+  <Refrigerator size={13} />
+  Kühlschrank
+</button>
                         <ChefHat size={12} /> Kochen
                       </button>
                       <button onClick={() => removeEntry(entry.id)} style={{

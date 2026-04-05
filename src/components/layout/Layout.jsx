@@ -7,8 +7,8 @@ const navItems = [
   { to: '/planner', label: 'Planer', icon: CalendarDays },
   { to: '/recipes', label: 'Rezepte', icon: BookOpen },
   { to: '/shopping', label: 'Einkauf', icon: ShoppingCart },
+  { to: '/fridge', label: 'Kühlschrank', icon: Refrigerator },
   { to: '/history', label: 'Historie', icon: Clock },
-  { to: '/settings', label: 'Einstellungen', icon: Settings },
 ]
 
 export default function Layout({ children }) {

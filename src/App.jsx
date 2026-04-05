@@ -12,6 +12,7 @@ import CookingMode from './pages/CookingMode'
 import History from './pages/History'
 import Settings from './pages/Settings'
 import Layout from './components/layout/Layout'
+import FridgeCheck from './pages/FridgeCheck'
 
 function AppRoutes() {
   const { user, household } = useAuthStore()
@@ -89,6 +90,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/*" element={<AppRoutes />} />
+        <Route path="/fridge" element={<FridgeCheck />} />
       </Routes>
     </BrowserRouter>
   )
