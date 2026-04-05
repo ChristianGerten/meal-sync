@@ -7,8 +7,7 @@ import { useAuthStore } from '../store/useAuthStore'
 import { useNavigate } from 'react-router-dom'
 import { SkeletonPlanDay, SkeletonStyles } from '../components/Skeleton'
 import { toast } from '../components/Toast'
-import { ChevronLeft, ChevronRight, Plus, X, ChefHat, FileText, Users, Shuffle } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { ChevronLeft, ChevronRight, Plus, X, ChefHat, FileText, Users, Shuffle, Refrigerator } from 'lucide-react'
 import { Refrigerator } from 'lucide-react'   
 
 const navigate = useNavigate()
