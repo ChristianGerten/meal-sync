@@ -146,31 +146,34 @@ export default function RecipeDetail() {
     }
   }
 
-  const handleSave = async () => {
-    if (!form.name.trim()) { toast.error('Name fehlt'); return }
-    setSaving(true)
-    try {
-      const recipeData = {
-        ...form,
-        tags: typeof form.tags === 'string'
-          ? form.tags.split(',').map(t => t.trim()).filter(Boolean)
-          : form.tags,
-        ingredients: form.ingredients.filter(i => i.name?.trim()),
-        steps: form.steps.filter(s => s?.trim())
-      }
-      if (id === 'new') {
-        const newRecipe = await useRecipeStore.getState().addRecipe(recipeData, household.id)
-        navigate('/recipes/' + newRecipe.id, { replace: true })
-      } else {
-        await updateRecipe(id, recipeData, household.id)
-        setEditing(false)
-      }
-    } catch (err) {
-      toast.error('Fehler: ' + err.message)
-    } finally {
-      setSaving(false)
+const handleSave = async () => {
+  if (!form.name.trim()) { toast.error('Name fehlt'); return }
+  setSaving(true)
+  try {
+    const recipeData = {
+      ...form,
+      difficulty: form.difficulty || null,  // ← leerer String → NULL
+      prep_time: form.prep_time || null,
+      cook_time: form.cook_time || null,
+      tags: typeof form.tags === 'string'
+        ? form.tags.split(',').map(t => t.trim()).filter(Boolean)
+        : form.tags,
+      ingredients: form.ingredients.filter(i => i.name?.trim()),
+      steps: form.steps.filter(s => s?.trim())
     }
+    if (id === 'new') {
+      const newRecipe = await useRecipeStore.getState().addRecipe(recipeData, household.id)
+      navigate('/recipes/' + newRecipe.id, { replace: true })
+    } else {
+      await updateRecipe(id, recipeData, household.id)
+      setEditing(false)
+    }
+  } catch (err) {
+    toast.error('Fehler: ' + err.message)
+  } finally {
+    setSaving(false)
   }
+}
 
   const handleDelete = async () => {
     if (!window.confirm('Rezept wirklich löschen?')) return
