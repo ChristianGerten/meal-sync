@@ -6,6 +6,8 @@ import {
   updateCachedItem,
   addToSyncQueue
 } from '../lib/offlineDB'
+import { toast } from '../components/Toast'
+import { deduplicateIngredients, normalizeIngredientName } from '../data/ingredientNormalizer'
 
 const SUPERMARKET_ORDER = [
   'Obst & Gemüse', 'Fleisch & Fisch', 'Kühlregal', 'Milchprodukte',
@@ -82,24 +84,19 @@ export const useShoppingStore = create((set, get) => ({
 
   fetchList: async (householdId, planId) => {
     set({ loading: true })
-
     const online = navigator.onLine
 
     if (!online) {
-      // Offline: aus IndexedDB laden
       const cachedItems = await getCachedItems()
-      const superItems = cachedItems.filter(i => i.store === 'supermarket' || !i.store)
-      const drugItems = cachedItems.filter(i => i.store === 'drugstore')
       set({
-        items: superItems,
-        drugstoreItems: drugItems,
+        items: cachedItems.filter(i => i.store !== 'drugstore'),
+        drugstoreItems: cachedItems.filter(i => i.store === 'drugstore'),
         loading: false,
         isOffline: true
       })
       return
     }
 
-    // Online: von Supabase laden
     try {
       let { data: list } = await supabase
         .from('shopping_lists')
@@ -148,13 +145,11 @@ export const useShoppingStore = create((set, get) => ({
         .eq('list_id', drugList.id)
         .order('category')
 
-      const allItems = [...(items || []), ...(drugItems || [])]
-
-      // In IndexedDB cachen für Offline-Nutzung
-      await cacheItems(allItems.map(i => ({
-        ...i,
-        store: drugItems?.find(d => d.id === i.id) ? 'drugstore' : 'supermarket'
-      })))
+      const allItems = [
+        ...(items || []).map(i => ({ ...i, store: 'supermarket' })),
+        ...(drugItems || []).map(i => ({ ...i, store: 'drugstore' }))
+      ]
+      await cacheItems(allItems)
 
       set({
         list,
@@ -164,8 +159,7 @@ export const useShoppingStore = create((set, get) => ({
         loading: false,
         isOffline: false
       })
-    } catch (err) {
-      // Fallback auf Cache
+    } catch {
       const cachedItems = await getCachedItems()
       set({
         items: cachedItems.filter(i => i.store !== 'drugstore'),
@@ -187,39 +181,37 @@ export const useShoppingStore = create((set, get) => ({
 
     const manualNames = items
       .filter(i => i.is_manual)
-      .map(i => i.name.toLowerCase().trim())
+      .map(i => normalizeIngredientName(i.name).toLowerCase())
 
-    const itemMap = {}
+    // Alle Zutaten sammeln
+    const allIngredients = []
     entries.forEach(entry => {
       if (!entry.recipes?.ingredients) return
       const factor = (entry.servings || 2) / (entry.recipes.servings || 2)
-      entry.recipes.ingredients?.forEach(ing => {
+      entry.recipes.ingredients.forEach(ing => {
         if (!ing.name?.trim()) return
         if (isBasicIngredient(ing.name)) return
-        if (manualNames.includes(ing.name.toLowerCase().trim())) return
-
-        const key = ing.name.toLowerCase().trim() + '__' + (ing.unit || '')
-        if (itemMap[key]) {
-          itemMap[key].amount = itemMap[key].amount != null && ing.amount != null
-            ? Math.round((itemMap[key].amount + ing.amount * factor) * 10) / 10
-            : itemMap[key].amount
-        } else {
-          itemMap[key] = {
-            list_id: list.id,
-            name: ing.name.trim(),
-            amount: ing.amount != null ? Math.round(ing.amount * factor * 10) / 10 : null,
-            unit: ing.unit || null,
-            category: normalizeCategory(ing.category),
-            is_manual: false,
-            store: 'supermarket'
-          }
-        }
+        const normalizedName = normalizeIngredientName(ing.name)
+        if (manualNames.includes(normalizedName.toLowerCase())) return
+        allIngredients.push({
+          name: normalizedName,
+          amount: ing.amount != null
+            ? Math.round(ing.amount * factor * 10) / 10
+            : null,
+          unit: ing.unit || null,
+          category: normalizeCategory(ing.category),
+          list_id: list.id,
+          is_manual: false,
+          store: 'supermarket'
+        })
       })
     })
 
-    const newItems = Object.values(itemMap)
-    if (newItems.length > 0) {
-      await supabase.from('shopping_items').insert(newItems)
+    // Deduplizieren + Mengen addieren
+    const deduplicated = deduplicateIngredients(allIngredients)
+
+    if (deduplicated.length > 0) {
+      await supabase.from('shopping_items').insert(deduplicated)
     }
 
     const { data } = await supabase
@@ -228,9 +220,9 @@ export const useShoppingStore = create((set, get) => ({
       .eq('list_id', list.id)
       .order('category')
 
-    const allItems = data || []
-    await cacheItems(allItems.map(i => ({ ...i, store: 'supermarket' })))
-    set({ items: allItems })
+    const allItems = (data || []).map(i => ({ ...i, store: 'supermarket' }))
+    await cacheItems(allItems)
+    set({ items: data || [] })
   },
 
   addManualItem: async (name, amount, unit, category, store = 'supermarket') => {
@@ -238,9 +230,12 @@ export const useShoppingStore = create((set, get) => ({
     const targetList = store === 'drugstore' ? drugList : list
     if (!targetList) return
 
+    const normalizedName = normalizeIngredientName(name)
+
     const { data } = await supabase.from('shopping_items').insert({
       list_id: targetList.id,
-      name, amount: amount || null,
+      name: normalizedName,
+      amount: amount || null,
       unit: unit || null,
       category: store === 'drugstore'
         ? (category || 'Körperpflege')
@@ -259,11 +254,8 @@ export const useShoppingStore = create((set, get) => ({
     }
   },
 
-  // Offline-fähiges Abhaken
   toggleItem: async (itemId, checked, store = 'supermarket') => {
     const key = store === 'drugstore' ? 'drugstoreItems' : 'items'
-
-    // 1. Sofort im UI und IndexedDB updaten (optimistic)
     set({
       [key]: get()[key].map(i =>
         i.id === itemId ? { ...i, is_checked: checked } : i
@@ -272,73 +264,53 @@ export const useShoppingStore = create((set, get) => ({
     await updateCachedItem(itemId, { is_checked: checked })
 
     if (navigator.onLine) {
-      // 2a. Online: direkt zu Supabase
       try {
-        await supabase
-          .from('shopping_items')
-          .update({
-            is_checked: checked,
-            checked_at: checked ? new Date().toISOString() : null
-          })
-          .eq('id', itemId)
-      } catch (err) {
-        // Supabase fehlgeschlagen → zur Queue
-        await addToSyncQueue({
-          action: 'toggle',
-          item_id: itemId,
-          is_checked: checked
-        })
+        await supabase.from('shopping_items').update({
+          is_checked: checked,
+          checked_at: checked ? new Date().toISOString() : null
+        }).eq('id', itemId)
+      } catch {
+        await addToSyncQueue({ action: 'toggle', item_id: itemId, is_checked: checked })
       }
     } else {
-      // 2b. Offline: zur Sync-Queue
-      await addToSyncQueue({
-        action: 'toggle',
-        item_id: itemId,
-        is_checked: checked
-      })
+      await addToSyncQueue({ action: 'toggle', item_id: itemId, is_checked: checked })
     }
   },
 
   deleteItem: async (itemId, store = 'supermarket') => {
-  const key = store === 'drugstore' ? 'drugstoreItems' : 'items'
-  const item = get()[key].find(i => i.id === itemId)
+    const key = store === 'drugstore' ? 'drugstoreItems' : 'items'
+    const item = get()[key].find(i => i.id === itemId)
+    set({ [key]: get()[key].filter(i => i.id !== itemId) })
 
-  // Optimistic Update
-  set({ [key]: get()[key].filter(i => i.id !== itemId) })
-
-  if (navigator.onLine) {
-    try {
-      await supabase.from('shopping_items').delete().eq('id', itemId)
-    } catch {
+    if (navigator.onLine) {
+      try {
+        await supabase.from('shopping_items').delete().eq('id', itemId)
+      } catch {
+        await addToSyncQueue({ action: 'delete', item_id: itemId })
+      }
+    } else {
       await addToSyncQueue({ action: 'delete', item_id: itemId })
     }
-  } else {
-    await addToSyncQueue({ action: 'delete', item_id: itemId })
-  }
 
-  // Undo nur für manuelle Artikel
-  if (item?.is_manual) {
-    toast.undo(item.name + ' entfernt', async () => {
-      const { data } = await supabase.from('shopping_items').insert({
-        list_id: item.list_id,
-        name: item.name,
-        amount: item.amount,
-        unit: item.unit,
-        category: item.category,
-        is_manual: true,
-        store: item.store || store
-      }).select().single()
-      if (data) {
-        set({ [key]: [...get()[key], data] })
-      }
-    })
-  }
-},
+    if (item?.is_manual) {
+      toast.undo(item.name + ' entfernt', async () => {
+        const { data } = await supabase.from('shopping_items').insert({
+          list_id: item.list_id,
+          name: item.name,
+          amount: item.amount,
+          unit: item.unit,
+          category: item.category,
+          is_manual: true,
+          store: item.store || store
+        }).select().single()
+        if (data) set({ [key]: [...get()[key], data] })
+      })
+    }
+  },
 
   clearChecked: async (store = 'supermarket') => {
     const key = store === 'drugstore' ? 'drugstoreItems' : 'items'
     const checked = get()[key].filter(i => i.is_checked)
-
     set({ [key]: get()[key].filter(i => !i.is_checked) })
 
     for (const item of checked) {

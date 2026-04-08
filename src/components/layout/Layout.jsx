@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuthStore } from '../../store/useAuthStore'
-import { CalendarDays, BookOpen, ShoppingCart, Clock, Sun, Moon, LogOut, Refrigerator } from 'lucide-react'
+import { CalendarDays, BookOpen, ShoppingCart, Settings, Sun, Moon, LogOut } from 'lucide-react'
 
 const navItems = [
   { to: '/planner', label: 'Planer', icon: CalendarDays },
   { to: '/recipes', label: 'Rezepte', icon: BookOpen },
   { to: '/shopping', label: 'Einkauf', icon: ShoppingCart },
-  { to: '/fridge', label: 'Kühlschrank', icon: Refrigerator },
-  { to: '/history', label: 'Historie', icon: Clock },
+  { to: '/settings', label: 'Einstellungen', icon: Settings },
 ]
 
 export default function Layout({ children }) {
@@ -33,7 +32,6 @@ export default function Layout({ children }) {
       display: 'flex', flexDirection: 'column',
       height: '100dvh', background: 'var(--color-bg)'
     }}>
-
       <header style={{
         background: 'var(--color-surface)',
         borderBottom: '0.5px solid var(--color-border)',
@@ -68,22 +66,19 @@ export default function Layout({ children }) {
             </span>
           )}
         </div>
-
         <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
           <button onClick={() => setDark(d => !d)} style={{
             width: '30px', height: '30px', borderRadius: '8px',
-            background: 'none', border: 'none',
-            cursor: 'pointer', display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
+            background: 'none', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: 'var(--color-text-muted)'
           }}>
             {dark ? <Sun size={15} /> : <Moon size={15} />}
           </button>
           <button onClick={signOut} style={{
             width: '30px', height: '30px', borderRadius: '8px',
-            background: 'none', border: 'none',
-            cursor: 'pointer', display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
+            background: 'none', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: 'var(--color-text-muted)'
           }}>
             <LogOut size={15} />
@@ -114,7 +109,7 @@ export default function Layout({ children }) {
                 transition: 'background 0.15s'
               }}>
                 <Icon
-                  size={18}
+                  size={20}
                   strokeWidth={isActive ? 2 : 1.5}
                   color={isActive ? 'var(--color-accent)' : 'var(--color-text-muted)'}
                 />
